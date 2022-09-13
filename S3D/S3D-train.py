@@ -141,7 +141,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_epochs', default=10, type=int,
                         help='Number of training epochs.')
-    parser.add_argument('--workers', default=2, type=int,
+    parser.add_argument('--workers', default=10, type=int,
                         help='Number of data loader workers.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
@@ -257,7 +257,7 @@ if __name__ == '__main__':
         total_loss = 0
         total_val_loss = 0
         
-        bar = ChargingBar('EPOCH #' + str(t), max=(len(dl)*config['training']['bs']))#+len(val_dl)
+        bar = ChargingBar('EPOCH #' + str(t), max=(len(dl)*config['training']['bs']+len(val_dl)))
         train_correct = 0
         positive = 0
         negative = 0
@@ -298,23 +298,24 @@ if __name__ == '__main__':
         train_correct /= train_samples
         total_loss /= counter
         #model.eval()
-        for index, (val_images, val_labels) in enumerate(val_dl):
-    
-            #val_images = np.transpose(val_images, (0, 3, 1, 2))
+        with torch.no_grad():
+            for index, (val_images, val_labels) in enumerate(val_dl):
+
+                #val_images = np.transpose(val_images, (0, 3, 1, 2))
+                
+                val_images = val_images.to(dev)
+                val_labels = val_labels.unsqueeze(1)
+                val_pred = model(val_images)
+                val_pred = val_pred.cpu()
             
-            val_images = val_images.to(dev)
-            val_labels = val_labels.unsqueeze(1)
-            val_pred = model(val_images)
-            val_pred = val_pred.cpu()
-            with torch.no_grad():
                 val_loss = loss_func(val_pred, val_labels)
-            total_val_loss += round(val_loss.item(), 2)
-            corrects, positive_class, negative_class = check_correct(val_pred, val_labels)
-            val_correct += corrects
-            val_positive += positive_class
-            val_counter += 1
-            val_negative += negative_class
-            bar.next()
+                total_val_loss += round(val_loss.item(), 2)
+                corrects, positive_class, negative_class = check_correct(val_pred, val_labels)
+                val_correct += corrects
+                val_positive += positive_class
+                val_counter += 1
+                val_negative += negative_class
+                bar.next()
             
         bar.finish()
             
