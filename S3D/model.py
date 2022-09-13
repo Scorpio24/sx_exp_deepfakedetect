@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torchsummary import summary
 
 
 class S3D(nn.Module):
@@ -331,5 +330,7 @@ class Mixed_5c(nn.Module):
         return out
 
 if __name__ == '__main__':
+    from torchsummary import summary
+    
     model = S3D(2)
     summary(model, (3, 100, 224, 224), device='cpu')
