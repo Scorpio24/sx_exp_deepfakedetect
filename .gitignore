@@ -3,3 +3,4 @@ example
 test.ipynb
 test.jpg
 models
+*.txt

@@ -145,7 +145,7 @@ if __name__ == '__main__':
                         help='Number of data loader workers.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default='All', 
+    parser.add_argument('--dataset', type=str, default='DFDC', 
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
@@ -261,7 +261,6 @@ if __name__ == '__main__':
         train_correct = 0
         positive = 0
         negative = 0
-        #model.train()
         for index, (images, labels) in enumerate(dl):
             #images = np.transpose(images, (0, 3, 1, 2))
             labels = labels.unsqueeze(1)
@@ -297,7 +296,6 @@ if __name__ == '__main__':
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
-        #model.eval()
         with torch.no_grad():
             for index, (val_images, val_labels) in enumerate(val_dl):
 
@@ -333,4 +331,5 @@ if __name__ == '__main__':
     
         if not os.path.exists(MODELS_PATH):
             os.makedirs(MODELS_PATH)
-        torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "efficientnetB"+str(opt.efficient_net)+"_checkpoint" + str(t) + "_" + opt.dataset))
+        if t % 10 == 0:
+            torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "S3D"+"_checkpoint" + str(t) + "_" + opt.dataset))
