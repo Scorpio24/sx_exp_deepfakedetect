@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 
 import numpy as np
+from get_masked_face import get_masked_face
 
 import uuid
 from albumentations import Compose, RandomBrightnessContrast, \
@@ -11,10 +12,11 @@ from albumentations import Compose, RandomBrightnessContrast, \
 from transforms.albu import IsotropicResize
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos, labels, image_size, mode = 'train'):
+    def __init__(self, videos, labels, image_size, device, mode = 'train'):
         self.x = videos
         self.y = torch.from_numpy(labels)
         self.image_size = image_size
+        self.device = device
         self.mode = mode
         self.n_samples = videos.shape[0]
     
@@ -57,9 +59,11 @@ class DeepFakesDataset(Dataset):
         #cv2.imwrite("../dataset/augmented_frames/isotropic_augmentation/"+str(unique)+"_"+str(index)+"_original.png", image)
    
         video = list(map(lambda f: transform(image=f)['image'], video))
+        if self.mode == "train":
+            video = list(map(lambda f: get_masked_face(f, self.device), video))
         #image = transform(image=image)['image']
         
-        #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
+        cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
         video = np.concatenate(video, axis=-1)
         video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()

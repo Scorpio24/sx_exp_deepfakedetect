@@ -3,6 +3,7 @@ import collections
 import glob
 import json
 import math
+from operator import mod
 import os
 from functools import partial
 from multiprocessing import Manager
@@ -162,10 +163,11 @@ if __name__ == '__main__':
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
-    dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
 
     num_class = 1
     model = S3D(num_class)
+    model.train()
     model.to(dev)
     optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
 
@@ -230,7 +232,7 @@ if __name__ == '__main__':
     validation_labels = np.asarray([row[1] for row in validation_dataset])
     labels = np.asarray([row[1] for row in train_dataset])
 
-    train_dataset = DeepFakesDataset(np.asarray([row[0] for row in train_dataset]), labels, config['model']['image-size'])
+    train_dataset = DeepFakesDataset(np.asarray([row[0] for row in train_dataset]), labels, config['model']['image-size'], device=dev)
     dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -238,7 +240,7 @@ if __name__ == '__main__':
                                  persistent_workers=False)
     del train_dataset
 
-    validation_dataset = DeepFakesDataset(np.asarray([row[0] for row in validation_dataset]), validation_labels, config['model']['image-size'], mode='validation')
+    validation_dataset = DeepFakesDataset(np.asarray([row[0] for row in validation_dataset]), validation_labels, config['model']['image-size'], device=dev, mode='validation')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,

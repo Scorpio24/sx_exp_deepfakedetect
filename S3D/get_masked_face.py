@@ -7,12 +7,12 @@ import numpy as np
 
 
 #输入图片，得到对应的掩码处理后的结果。
-#图片格式为cv2读取后的格式，shape为（H，W，C），颜色通道顺序已从BGR转换为RGB。
-def get_masked_face(input_img):
+#图片格式为cv2读取后的格式，shape为（H，W，C），颜色通道顺序为CV2的BGR（这个没什么关系）。
+def get_masked_face(input_img, dev):
     #默认使用GPU，如果要在CPU上运行，则需要添加参数device='cpu'。
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D)
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, device=dev)
     #并获取人脸关键点。
-    preds = fa.get_landmarks(input_img)
+    preds = fa.get_landmarks_from_image(input_img)
 
     #计算各区域边界。
     left_eye_left = math.ceil(preds[0][36, 0] - (preds[0][39, 0] - preds[0][36, 0])*0.1)
@@ -62,8 +62,10 @@ def get_masked_face(input_img):
     masked = np.uint8(masked*255)
     #cv2.imshow(masked)
 
+    return masked
+
 if __name__ == 'main':
     #读取图片。
     img_path = "test.jpg"
-    input_img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+    input_img = cv2.imread(img_path)
     get_masked_face(input_img)

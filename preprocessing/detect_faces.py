@@ -62,7 +62,7 @@ def main():
                         help='Videos directory')
     parser.add_argument("--detector-type", help="Type of the detector", default="FacenetDetector",
                         choices=["FacenetDetector"])
-    parser.add_argument("--processes", help="Number of processes", default=1)
+    parser.add_argument("--processes", type=int, help="Number of processes", default=1)
     opt = parser.parse_args()
     print(opt)
 

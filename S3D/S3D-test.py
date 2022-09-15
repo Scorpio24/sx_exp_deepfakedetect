@@ -109,7 +109,7 @@ def read_frames(video_path, videos):
 
     # Group the faces with the same index, reduce probabiity to skip some faces in the same video
     for path in frames_paths:
-        for i in range(0,3):
+        for i in range(0,1):
             if "_" + str(i) in path:
                 if i not in frames_paths_dict.keys():
                     frames_paths_dict[i] = [path]
@@ -204,13 +204,13 @@ if __name__ == "__main__":
         for index, video_folder in enumerate(os.listdir(method_folder)):
             paths.append(os.path.join(method_folder, video_folder))
 
-    for path in paths:
-        read_frames(path, videos)
+    #for path in paths:
+    #    read_frames(path, videos)
       
-    #with Pool(processes=opt.workers) as p:
-    #    with tqdm(total=len(paths)) as pbar:
-    #        for v in p.imap_unordered(partial(read_frames, videos=videos),paths):
-    #            pbar.update()
+    with Pool(processes=opt.workers) as p:
+        with tqdm(total=len(paths)) as pbar:
+            for v in p.imap_unordered(partial(read_frames, videos=videos),paths):
+                pbar.update()
 
     video_names = np.asarray([row[2] for row in videos])
     correct_test_labels = np.asarray([row[1] for row in videos])
