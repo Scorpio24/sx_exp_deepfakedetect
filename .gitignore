@@ -4,3 +4,4 @@ test.ipynb
 test.jpg
 models
 *.txt
+S3D/__pycache__
