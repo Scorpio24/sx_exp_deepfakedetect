@@ -127,13 +127,13 @@ def read_frames(video_path, videos):
     # Select N frames from the collected ones
     video = {}
     snippet = []
+    transform = create_base_transform(config['model']['image-size'])
     for key in frames_paths_dict.keys():
         if len(frames_paths_dict[key]) < 20:
             continue
         frames_paths_dict[key] = frames_paths_dict[key][:20]
         for index, frame_image in enumerate(frames_paths_dict[key]):
             #image = np.asarray(resize(cv2.imread(os.path.join(video_path, frame_image)), IMAGE_SIZE))
-            transform = create_base_transform(config['model']['image-size'])
             image = transform(image=cv2.imread(os.path.join(video_path, frame_image)))['image']
             snippet.append(image)
     if len(snippet) > 0:

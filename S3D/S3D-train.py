@@ -3,11 +3,10 @@ import collections
 import glob
 import json
 import math
-from operator import mod
 import os
 from functools import partial
 from multiprocessing import Manager
-from multiprocessing.pool import Pool
+from operator import mod
 
 import cv2
 import numpy as np
@@ -17,6 +16,8 @@ import torch.nn.functional as F
 import yaml
 from progress.bar import ChargingBar
 from torch import optim
+#from multiprocessing.pool import Pool
+from torch.multiprocessing import Pool, set_start_method
 from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
@@ -127,9 +128,7 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             continue
         frames_paths_dict[key] = frames_paths_dict[key][:20]
         for _, frame_image in enumerate(frames_paths_dict[key]):
-            #image = transform(np.asarray(cv2.imread(os.path.join(video_path, frame_image))))
-            image = cv2.imread(os.path.join(video_path, frame_image))
-            #image = image[...,::-1]
+            image=cv2.imread(os.path.join(video_path, frame_image))
             snippet.append(image)
     if len(snippet) != 0:
         if TRAINING_DIR in video_path:
@@ -138,11 +137,13 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             validation_dataset.append((snippet, label))
 
 if __name__ == '__main__':
-    
+    #这个设置可以让masked处理程序可以在dataloader中正确运行，解决了cuda不能在fork的进程中运行的问题。
+    set_start_method('spawn')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_epochs', default=10, type=int,
                         help='Number of training epochs.')
-    parser.add_argument('--workers', default=10, type=int,
+    parser.add_argument('--workers', default=1, type=int,
                         help='Number of data loader workers.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
@@ -198,11 +199,11 @@ if __name__ == '__main__':
     train_dataset = mgr.list()
     validation_dataset = mgr.list()
 
-    with Pool(processes=opt.workers) as p:
+    with Pool(processes=10) as p:
         with tqdm(total=len(paths)) as pbar:
             for v in p.imap_unordered(partial(read_frames, 
                 train_dataset=train_dataset, 
-                validation_dataset=validation_dataset, 
+                validation_dataset=validation_dataset,
                 config=config),
                 paths):
                 pbar.update()
@@ -213,7 +214,7 @@ if __name__ == '__main__':
     validation_dataset = shuffle_dataset(validation_dataset)
 
     # Print some useful statistics
-    print("Train images:", len(train_dataset), "Validation images:", len(validation_dataset))
+    print("Train videos:", len(train_dataset), "Validation videos:", len(validation_dataset))
     print("__TRAINING STATS__")
     train_counters = collections.Counter(image[1] for image in train_dataset)
     print(train_counters)
@@ -232,7 +233,11 @@ if __name__ == '__main__':
     validation_labels = np.asarray([row[1] for row in validation_dataset])
     labels = np.asarray([row[1] for row in train_dataset])
 
-    train_dataset = DeepFakesDataset(np.asarray([row[0] for row in train_dataset]), labels, config['model']['image-size'], device=dev)
+    train_dataset = DeepFakesDataset(
+        np.asarray([row[0] for row in train_dataset]), 
+        labels, 
+        config['model']['image-size'], 
+        mask_method='noise')
     dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -240,7 +245,12 @@ if __name__ == '__main__':
                                  persistent_workers=False)
     del train_dataset
 
-    validation_dataset = DeepFakesDataset(np.asarray([row[0] for row in validation_dataset]), validation_labels, config['model']['image-size'], device=dev, mode='validation')
+    validation_dataset = DeepFakesDataset(
+        np.asarray([row[0] for row in validation_dataset]), 
+        validation_labels, 
+        config['model']['image-size'], 
+        mask_method='noise', 
+        mode='validation')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,

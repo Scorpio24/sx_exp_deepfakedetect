@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 
 import numpy as np
-from get_masked_face import get_masked_face
+from get_masked_face_simple import get_masked_face_simple
 
 import uuid
 from albumentations import Compose, RandomBrightnessContrast, \
@@ -12,11 +12,11 @@ from albumentations import Compose, RandomBrightnessContrast, \
 from transforms.albu import IsotropicResize
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos, labels, image_size, device, mode = 'train'):
+    def __init__(self, videos, labels, image_size, mask_method, mode = 'train'):
         self.x = videos
         self.y = torch.from_numpy(labels)
         self.image_size = image_size
-        self.device = device
+        self.mask_method = mask_method
         self.mode = mode
         self.n_samples = videos.shape[0]
     
@@ -47,7 +47,6 @@ class DeepFakesDataset(Dataset):
     def __getitem__(self, index):
         #video is a list of frames
         video = self.x[index]
-        #image = np.asarray(self.x[index])
         video = list(map(np.asarray, video))
 
         if self.mode == 'train':
@@ -56,18 +55,14 @@ class DeepFakesDataset(Dataset):
             transform = self.create_val_transform(self.image_size)
                 
         unique = uuid.uuid4()
-        #cv2.imwrite("../dataset/augmented_frames/isotropic_augmentation/"+str(unique)+"_"+str(index)+"_original.png", image)
-   
-        video = list(map(lambda f: transform(image=f)['image'], video))
-        if self.mode == "train":
-            video = list(map(lambda f: get_masked_face(f, self.device), video))
-        #image = transform(image=image)['image']
         
-        cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
+        video = list(map(lambda f: transform(image=f)['image'], video))
+        video = list(map(lambda f: get_masked_face_simple(input_img=f, mask_method=self.mask_method), video))
+        
+        #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
         video = np.concatenate(video, axis=-1)
         video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
-        #video = video.mul_(2.).sub_(255).div(255)
         video = video.view(-1,3,video.size(1),video.size(2)).permute(1,0,2,3)
 
         return video, self.y[index]
