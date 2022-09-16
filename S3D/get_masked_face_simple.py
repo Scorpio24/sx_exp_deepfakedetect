@@ -18,11 +18,11 @@ def get_masked_face_simple(input_img, mask_method):
     wight = input_img.shape[1]
     #计算各区域边界。
     left_eye_left = math.ceil(wight/5)
-    left_eye_top = math.ceil(hight/6)
-    left_eye_bottom = math.ceil(hight/6 + hight/20)
-    right_eye_top = math.ceil(hight/6)
+    left_eye_top = math.ceil(hight/4)
+    left_eye_bottom = math.ceil(hight/4 + hight/6)
+    right_eye_top = math.ceil(hight/4)
     right_eye_right = math.ceil(wight - wight / 5)
-    right_eye_bottom = math.ceil(hight/6 + hight/20)
+    right_eye_bottom = math.ceil(hight/4 + hight/6)
     mouth_left = math.ceil(wight/3)
     mouth_right = math.ceil(wight - wight/3)
     mouth_bottom = math.ceil(hight - hight/5)
