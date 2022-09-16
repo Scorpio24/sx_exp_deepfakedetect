@@ -57,7 +57,8 @@ class DeepFakesDataset(Dataset):
         unique = uuid.uuid4()
         
         video = list(map(lambda f: transform(image=f)['image'], video))
-        video = list(map(lambda f: get_masked_face_simple(input_img=f, mask_method=self.mask_method), video))
+        if self.mode == 'train':
+            video = list(map(lambda f: get_masked_face_simple(input_img=f, mask_method=self.mask_method), video))
         
         #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
