@@ -62,6 +62,8 @@ class DeepFakesDataset(Dataset):
         
         #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
+        # 将视频帧在通道维度拼接起来，并进行一些细节转换操作。
+        # 最后video的shape为（帧数目，通道数，hight， wight）。
         video = np.concatenate(video, axis=-1)
         video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
         video = video.view(-1,3,video.size(1),video.size(2)).permute(1,0,2,3)
