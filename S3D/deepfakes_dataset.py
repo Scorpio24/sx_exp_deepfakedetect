@@ -1,3 +1,4 @@
+import random
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 
@@ -57,8 +58,10 @@ class DeepFakesDataset(Dataset):
         unique = uuid.uuid4()
         
         video = list(map(lambda f: transform(image=f)['image'], video))
-        if self.mode == 'train':
-            video = list(map(lambda f: get_masked_face_simple(input_img=f, mask_method=self.mask_method), video))
+        if self.mode == 'train':# 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
+            random_list = [i for i in range(0, 8)]
+            random.shuffle(random_list)
+            video = list(map(lambda f: get_masked_face_simple(input_img=f, random_list=random_list, mask_method=self.mask_method), video))
         
         #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         

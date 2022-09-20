@@ -9,7 +9,7 @@ import numpy as np
 # 输入图片，得到对应的掩码处理后的结果。
 # 图片格式为cv2读取后的格式，shape为（H，W，C），颜色通道顺序为CV2的BGR（这个没什么关系）。
 # mask_method='black' or 'noise'，前者为黑色填充，后者为高斯噪声填充。
-def get_masked_face_simple(input_img, mask_method):
+def get_masked_face_simple(input_img, random_list, mask_method):
 
     if mask_method not in ['black', 'noise']:
         print("please input mask_method('black' or 'noise').\nno change for input image.")
@@ -47,10 +47,10 @@ def get_masked_face_simple(input_img, mask_method):
     mask_area8 = np.array([[[input_img.shape[:2][1], input_img.shape[:2][0]], [mouth_right, input_img.shape[:2][0]], [mouth_right, mouth_bottom], [input_img.shape[:2][1], mouth_bottom]]], dtype = np.int32)
     mask_list = [mask_area1, mask_area2, mask_area3, mask_area4, mask_area5, mask_area6, mask_area7, mask_area8]
 
-    random.shuffle(mask_list)
     if mask_method == 'black': #随机选择6个区域，使用黑色填充。
         masked = input_img
-        for mask_area in mask_list[0:6]:#超参数：6
+        for i in random_list[:6]:#超参数：6
+            mask_area = mask_list[i]
             mask = np.full(input_img.shape[:2], 255, dtype = 'uint8')
             cv2.polylines(mask, mask_area, 1, 255)
             cv2.fillPoly(mask, mask_area, 0)
@@ -59,7 +59,8 @@ def get_masked_face_simple(input_img, mask_method):
     elif mask_method == 'noise': #随机选择6个区域，添加高斯噪声。
         masked = np.array(input_img).copy()
         masked = masked / 255.0
-        for mask_area in mask_list[0:6]:#超参数：6
+        for i in random_list[:6]:#超参数：6
+            mask_area = mask_list[i]
             mask_shape = (mask_area[0][0][1] - mask_area[0][2][1], mask_area[0][0][0] - mask_area[0][2][0], 3)
             # 产生高斯 noise
             noise = np.random.normal(0, 1, mask_shape)
@@ -77,7 +78,8 @@ if __name__ == '__main__':
     #读取图片。
     img_path = "1_0.png"
     input_img = cv2.imread(img_path, cv2.IMREAD_COLOR)[...,::-1]
-    #input_img = Image.fromarray(input_img)
-    masked = get_masked_face_simple(input_img, 'noise')
+    random_list = [i for i in range(0, 8)]
+    random.shuffle(random_list)
+    masked = get_masked_face_simple(input_img, random_list, 'noise')
     cv2.imshow('masked', masked)
     cv2.waitKey(0)
