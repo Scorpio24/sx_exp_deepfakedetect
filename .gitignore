@@ -1,8 +1,8 @@
 data
 example
-test.ipynb
-test.jpg
+test.*
 models
 *.txt
 S3D/__pycache__
 *.docx
+*.png

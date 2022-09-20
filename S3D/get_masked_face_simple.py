@@ -2,6 +2,7 @@ import math
 import random
 
 import cv2
+from facenet_pytorch.models.mtcnn import MTCNN
 import numpy as np
 
 
@@ -14,18 +15,26 @@ def get_masked_face_simple(input_img, mask_method):
         print("please input mask_method('black' or 'noise').\nno change for input image.")
         return input_img
 
+    detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cpu")
+    _, _, landmarks = detector.detect(input_img, landmarks=True)
     hight = input_img.shape[0]
     wight = input_img.shape[1]
+    landmarks = landmarks[0]
+
     #计算各区域边界。
-    left_eye_left = math.ceil(wight/5)
-    left_eye_top = math.ceil(hight/4)
-    left_eye_bottom = math.ceil(hight/4 + hight/6)
-    right_eye_top = math.ceil(hight/4)
-    right_eye_right = math.ceil(wight - wight / 5)
-    right_eye_bottom = math.ceil(hight/4 + hight/6)
-    mouth_left = math.ceil(wight/3)
-    mouth_right = math.ceil(wight - wight/3)
-    mouth_bottom = math.ceil(hight - hight/5)
+    eyes_wight = wight * 0.2
+    eyes_hight = hight * 0.16
+    mouth_wight = landmarks[4][0] - landmarks[3][0]
+    mouth_hight = hight * 0.16
+    left_eye_left = math.ceil(landmarks[0][0] - eyes_wight / 2)
+    left_eye_top = math.ceil(landmarks[0][1] - eyes_hight / 2)
+    left_eye_bottom = math.ceil(landmarks[0][1] + eyes_hight / 2)
+    right_eye_top = math.ceil(landmarks[1][1] - eyes_hight / 2)
+    right_eye_right = math.ceil(landmarks[1][0] + eyes_wight / 2)
+    right_eye_bottom = math.ceil(landmarks[1][1] + eyes_hight / 2)
+    mouth_left = math.ceil(landmarks[3][0] - mouth_wight / 10)
+    mouth_right = math.ceil(landmarks[4][0] + mouth_wight / 10)
+    mouth_bottom = math.ceil(landmarks[3][1] + mouth_hight / 2)
 
     #计算各个区域的掩码区域。
     mask_area1 = np.array([[[left_eye_left, left_eye_bottom], [0, left_eye_bottom], [0, 0], [left_eye_left, 0]]], dtype = np.int32)
@@ -66,7 +75,9 @@ def get_masked_face_simple(input_img, mask_method):
 
 if __name__ == '__main__':
     #读取图片。
-    img_path = "test.jpg"
-    input_img = cv2.imread(img_path)
+    img_path = "1_0.png"
+    input_img = cv2.imread(img_path, cv2.IMREAD_COLOR)[...,::-1]
+    #input_img = Image.fromarray(input_img)
     masked = get_masked_face_simple(input_img, 'noise')
     cv2.imshow('masked', masked)
+    cv2.waitKey(0)
