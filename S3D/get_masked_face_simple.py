@@ -17,6 +17,8 @@ def get_masked_face_simple(input_img, random_list, mask_method):
 
     detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cpu")
     _, _, landmarks = detector.detect(input_img, landmarks=True)
+    if landmarks is None:
+        return input_img
     hight = input_img.shape[0]
     wight = input_img.shape[1]
     landmarks = landmarks[0]
