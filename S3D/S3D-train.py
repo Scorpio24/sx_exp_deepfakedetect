@@ -158,8 +158,6 @@ if __name__ == '__main__':
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str, default="S3D/configs/architecture.yaml", 
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--efficient_net', type=int, default=0, 
-                        help="Which EfficientNet version to use (0 or 7, default: 0)")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     
@@ -252,7 +250,8 @@ if __name__ == '__main__':
         np.asarray([row[0] for row in train_dataset]), 
         labels, 
         config['model']['image-size'], 
-        mask_method='noise')
+        config['training']['mask-method'], 
+        config['training']['mask-number'])
     dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -264,7 +263,8 @@ if __name__ == '__main__':
         np.asarray([row[0] for row in validation_dataset]), 
         validation_labels, 
         config['model']['image-size'], 
-        mask_method='noise', 
+        config['training']['mask-method'], 
+        config['training']['mask-number'],
         mode='validation')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,

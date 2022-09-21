@@ -332,5 +332,5 @@ class Mixed_5c(nn.Module):
 if __name__ == '__main__':
     from torchsummary import summary
     
-    model = S3D(2)
-    summary(model, (3, 100, 224, 224), device='cpu')
+    model = S3D(1)
+    summary(model, (3, 20, 224, 224), batch_size=32, device='cpu')

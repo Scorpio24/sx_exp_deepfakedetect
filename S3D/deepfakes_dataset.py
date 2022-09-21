@@ -13,11 +13,12 @@ from albumentations import Compose, RandomBrightnessContrast, \
 from transforms.albu import IsotropicResize
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos, labels, image_size, mask_method, mode = 'train'):
+    def __init__(self, videos, labels, image_size, mask_method, mask_number, mode = 'train'):
         self.x = videos
         self.y = torch.from_numpy(labels)
         self.image_size = image_size
         self.mask_method = mask_method
+        self.mask_number = mask_number
         self.mode = mode
         self.n_samples = videos.shape[0]
     
@@ -58,15 +59,19 @@ class DeepFakesDataset(Dataset):
         unique = uuid.uuid4()
         
         video = list(map(lambda f: transform(image=f)['image'], video))
-        if self.mode == 'train':# 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
+        if self.mode == 'train' and self.mask_method != 'none':# 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
             random_list = [i for i in range(0, 8)]
             random.shuffle(random_list)
-            video = list(map(lambda f: get_masked_face_simple(input_img=f, random_list=random_list, mask_method=self.mask_method), video))
+            video = list(map(lambda f: get_masked_face_simple(
+                input_img=f, 
+                random_list=random_list, 
+                mask_method=self.mask_method, 
+                mask_number=self.mask_number), video))
         
         #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
         # 将视频帧在通道维度拼接起来，并进行一些细节转换操作。
-        # 最后video的shape为（帧数目，通道数，hight， wight）。
+        # 最后video的shape为（通道数，帧数目，hight， wight）。
         video = np.concatenate(video, axis=-1)
         video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
         video = video.view(-1,3,video.size(1),video.size(2)).permute(1,0,2,3)
