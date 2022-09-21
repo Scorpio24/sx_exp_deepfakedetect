@@ -27,10 +27,10 @@
     * ./S3D-train.py：训练模型的程序文件。
     * ./utils.py：工具方法的程序文件。
 ## 运行方法
-在./SX_shiyan目录下运行，以保证程序正确处理目录。
+在./SX_shiyan目录下运行，以保证程序正确处理目录。需要通过--config参数指定配置文件拿名称。
 如：
 
-    python3 ./S3D/S3D-train.py
+    python3 ./S3D/S3D-train.py --config plan1
 ## 注意事项
 实验中使用的albumentations库为新版本，而根据参考项目的environment.yml文件创建的环境中albumentations库为老版本，所以需要用如下命令升级：
     

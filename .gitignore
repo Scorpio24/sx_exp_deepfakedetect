@@ -6,3 +6,4 @@ models
 S3D/__pycache__
 *.docx
 *.png
+.vscode

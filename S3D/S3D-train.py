@@ -156,7 +156,7 @@ if __name__ == '__main__':
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str, default="S3D/configs/architecture.yaml", 
+    parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
@@ -164,10 +164,12 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
 
+    if not opt.config:
+        raise Exception("please input name of config file by '--config' .")
     # 读取配置文件。
-    with open(opt.config, 'r') as ymlfile:
+    config_path = os.path.join("S3D/configs", opt.config+".yaml")
+    with open(config_path, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
-    config_name = os.path.basename(opt.config).replace(".yaml", "")
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -375,9 +377,9 @@ if __name__ == '__main__':
         if t % 10 == 0:
             torch.save(model.state_dict(), 
                 os.path.join(MODELS_PATH,  
-                "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + config_name))
+                "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
 
     # 保存最终模型。
     torch.save(model.state_dict(), 
         os.path.join(MODELS_PATH, 
-        "final_models",  "S3D_final_" + opt.dataset + "_" + config_name))
+        "final_models",  "S3D_final_" + opt.dataset + "_" + opt.config))
