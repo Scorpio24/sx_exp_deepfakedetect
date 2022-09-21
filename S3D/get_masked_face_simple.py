@@ -28,13 +28,13 @@ def get_masked_face_simple(input_img, random_list, mask_method):
     eyes_hight = hight * 0.16
     mouth_wight = landmarks[4][0] - landmarks[3][0]
     mouth_hight = hight * 0.16
-    left_eye_left = math.ceil(landmarks[0][0] - eyes_wight / 2)
-    left_eye_top = math.ceil(landmarks[0][1] - eyes_hight / 2)
+    left_eye_left = max(math.ceil(landmarks[0][0] - eyes_wight / 2), 0)
+    left_eye_top = max(math.ceil(landmarks[0][1] - eyes_hight / 2), 0)
     left_eye_bottom = math.ceil(landmarks[0][1] + eyes_hight / 2)
-    right_eye_top = math.ceil(landmarks[1][1] - eyes_hight / 2)
+    right_eye_top = max(math.ceil(landmarks[1][1] - eyes_hight / 2), 0)
     right_eye_right = math.ceil(landmarks[1][0] + eyes_wight / 2)
     right_eye_bottom = math.ceil(landmarks[1][1] + eyes_hight / 2)
-    mouth_left = math.ceil(landmarks[3][0] - mouth_wight / 10)
+    mouth_left = max(math.ceil(landmarks[3][0] - mouth_wight / 10), 0)
     mouth_right = math.ceil(landmarks[4][0] + mouth_wight / 10)
     mouth_bottom = math.ceil(landmarks[3][1] + mouth_hight / 2)
 
