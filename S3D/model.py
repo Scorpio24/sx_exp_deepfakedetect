@@ -1,13 +1,21 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-
+from SRM.HPF import HPF
 
 class S3D(nn.Module):
-    def __init__(self, num_class):
+    def __init__(self, num_class, SRM_net):
         super(S3D, self).__init__()
+
+        self.SRM_net = SRM_net
+        if SRM_net == 'yes':
+            input_channels = 30
+        else:
+            input_channels = 3
+
+        self.SRM = HPF()
         self.base = nn.Sequential(
-            SepConv3d(3, 64, kernel_size=7, stride=2, padding=3),
+            SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),
             BasicConv3d(64, 64, kernel_size=1, stride=1),
             SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),
@@ -27,7 +35,11 @@ class S3D(nn.Module):
         self.fc = nn.Sequential(nn.Conv3d(1024, num_class, kernel_size=1, stride=1, bias=True),)
 
     def forward(self, x):
-        y = self.base(x)
+        if self.SRM_net == 'yes':
+            y = self.SRM(x)
+        else:
+            y = x
+        y = self.base(y)
         y = F.avg_pool3d(y, (2, y.size(3), y.size(4)), stride=1)
         y = self.fc(y)
         y = y.view(y.size(0), y.size(1), y.size(2))
@@ -332,5 +344,5 @@ class Mixed_5c(nn.Module):
 if __name__ == '__main__':
     from torchsummary import summary
     
-    model = S3D(1)
+    model = S3D(1, 'yes')
     summary(model, (3, 20, 224, 224), batch_size=32, device='cpu')

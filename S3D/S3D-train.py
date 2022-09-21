@@ -170,12 +170,12 @@ if __name__ == '__main__':
     config_path = os.path.join("S3D/configs", opt.config+".yaml")
     with open(config_path, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
-
+    print(config)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
     # 获得模型和优化器。
     num_class = 1
-    model = S3D(num_class)
+    model = S3D(num_class, config['model']['SRM-net'])
     model.train()
     model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
@@ -378,6 +378,7 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), 
                 os.path.join(MODELS_PATH,  
                 "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
+        #exit()
 
     # 保存最终模型。
     torch.save(model.state_dict(), 

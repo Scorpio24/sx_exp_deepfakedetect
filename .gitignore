@@ -3,7 +3,7 @@ example
 test.*
 models
 *.txt
-S3D/__pycache__
+**/__pycache__
 *.docx
 *.png
 .vscode

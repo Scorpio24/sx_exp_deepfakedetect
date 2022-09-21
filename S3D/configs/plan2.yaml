@@ -9,7 +9,7 @@ training:
   frames-per-video: 30 # Equidistant frames
   mask-method: 'none' # 'black', 'noise' or 'none'
   mask-number: 6 # range(0, 9)
-  picture-color: 'rgb' # 'rgb' or 'gray'
+  picture-color: 'gray' # 'rgb' or 'gray'
 
 model:
   image-size: 224
