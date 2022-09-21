@@ -1,7 +1,7 @@
 training:
   lr: 0.01
   weight-decay: 0.000001
-  bs: 4 # batch-size
+  bs: 32 # batch-size
   gamma: 0.1
   step-size: 15
   rebalancing_fake: 0.3
