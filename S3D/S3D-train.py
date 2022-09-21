@@ -167,6 +167,7 @@ if __name__ == '__main__':
     # 读取配置文件。
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
+    config_name = os.path.basename(opt.config).replace(".yaml", "")
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -251,7 +252,8 @@ if __name__ == '__main__':
         labels, 
         config['model']['image-size'], 
         config['training']['mask-method'], 
-        config['training']['mask-number'])
+        config['training']['mask-number'],
+        config['training']['picture-color'])
     dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -265,6 +267,7 @@ if __name__ == '__main__':
         config['model']['image-size'], 
         config['training']['mask-method'], 
         config['training']['mask-number'],
+        config['training']['picture-color'],
         mode='validation')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
@@ -370,7 +373,11 @@ if __name__ == '__main__':
         if not os.path.exists(MODELS_PATH):
             os.makedirs(MODELS_PATH)
         if t % 10 == 0:
-            torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "S3D"+"_checkpoint" + str(t) + "_" + opt.dataset))
+            torch.save(model.state_dict(), 
+                os.path.join(MODELS_PATH,  
+                "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + config_name))
 
     # 保存最终模型。
-    torch.save(model.state_dict(), os.path.join(MODELS_PATH, "final_models",  "S3D"+"_final_" + opt.dataset))
+    torch.save(model.state_dict(), 
+        os.path.join(MODELS_PATH, 
+        "final_models",  "S3D_final_" + opt.dataset + "_" + config_name))

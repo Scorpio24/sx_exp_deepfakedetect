@@ -13,12 +13,13 @@ from albumentations import Compose, RandomBrightnessContrast, \
 from transforms.albu import IsotropicResize
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos, labels, image_size, mask_method, mask_number, mode = 'train'):
+    def __init__(self, videos, labels, image_size, mask_method, mask_number, picture_color, mode = 'train'):
         self.x = videos
         self.y = torch.from_numpy(labels)
         self.image_size = image_size
         self.mask_method = mask_method
         self.mask_number = mask_number
+        self.picture_color = picture_color
         self.mode = mode
         self.n_samples = videos.shape[0]
     
@@ -67,6 +68,10 @@ class DeepFakesDataset(Dataset):
                 random_list=random_list, 
                 mask_method=self.mask_method, 
                 mask_number=self.mask_number), video))
+        
+        if self.picture_color == 'gray':
+            video = list(map(lambda f: cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), video))
+            video = list(map(lambda f: cv2.cvtColor(f, cv2.COLOR_GRAY2RGB), video))
         
         #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
         
