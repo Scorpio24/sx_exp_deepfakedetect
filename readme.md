@@ -31,13 +31,22 @@
 如：
 
     python3 ./S3D/S3D-train.py --config plan1
+
 添加了多GPU训练的代码 S3D\S3D-train-GPUs.py。运行参数如下：
 
     python -m torch.distributed.launch --nproc_per_node=1 --use_env S3D/S3D-train-GPUs.py --config plan1
 其中nproc_per_node为并行GPU的数量。
 ## 注意事项
-实验中使用的albumentations库为新版本，而根据参考项目的environment.yml文件创建的环境中albumentations库为老版本，所以需要用如下命令升级：
-    
-    pip3 install --upgrade albumentations
-        
+1. 实验中使用的albumentations库为新版本，而根据参考项目的environment.yml文件创建的环境中albumentations库为老版本，所以需要用如下命令升级：
 
+        pip3 install --upgrade albumentations
+
+2. 可以通过参数--workers来设置dataloader的num_workers，默认为1，合理设置可以提高运行速度，一般设置为CPU的核心数。系统的CPU核心数可以通过以下方法查看：
+
+        import os
+        os.cpu_count()
+    或者：
+
+        from multiprocessing import cpu_count
+        cpu_count()
+    例：os.cpu_count()=2，则运行程序时可以输入参数--workers 2
