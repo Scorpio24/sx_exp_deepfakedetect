@@ -7,10 +7,10 @@ training:
   rebalancing_fake: 0.3
   rebalancing_real: 1
   frames-per-video: 30 # Equidistant frames
-  mask-method: 'none' # 'black', 'noise' or 'none'
+  mask-method: 'noise' # 'black', 'noise' or 'none'
   mask-number: 6 # range(0, 9)
-  picture-color: 'gray' # 'rgb' or 'gray'
+  picture-color: 'rgb' # 'rgb' or 'gray'
 
 model:
   image-size: 224
-  SRM-net: 'no' # use SRM net or not.'yes' or 'no'
+  SRM-net: 'yes' # use SRM net or not.'yes' or 'no'

@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 import yaml
 from progress.bar import ChargingBar
@@ -166,11 +167,15 @@ if __name__ == '__main__':
 
     if not opt.config:
         raise Exception("please input name of config file by '--config' .")
+
     # 读取配置文件。
     config_path = os.path.join("S3D/configs", opt.config+".yaml")
     with open(config_path, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
     print(config)
+
+    tb_writer = SummaryWriter(log_dir="runs/" + opt.config)
+
     dev = "cuda" if torch.cuda.is_available() else "cpu"
 
     # 获得模型和优化器。
@@ -180,6 +185,10 @@ if __name__ == '__main__':
     model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+
+    # 在tensorboard中保存网络模型。
+    init_img = torch.zeros((1, 3, 20, 224, 224), device=dev)
+    tb_writer.add_graph(model, init_img)
 
     # 如果之前训练在某个点中断，可以从最近的检查点恢复。
     starting_epoch = 0
@@ -327,13 +336,15 @@ if __name__ == '__main__':
             for i in range(config['training']['bs']):
                 bar.next()
 
+        train_correct /= train_samples
+        total_loss /= counter
+
         # 设置验证集统计数据。
         val_correct = 0
         val_positive = 0
         val_negative = 0
         val_counter = 0
-        train_correct /= train_samples
-        total_loss /= counter
+        
         # 验证集预测。
         with torch.no_grad():
             for index, (val_images, val_labels) in enumerate(val_dl):
@@ -371,6 +382,13 @@ if __name__ == '__main__':
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
     
+        # 在tensorboard中保存本epoch的训练信息
+        tb_writer.add_scalar("train loss", total_loss, t)
+        tb_writer.add_scalar("train acc", train_correct, t)
+        tb_writer.add_scalar("val loss", total_val_loss, t)
+        tb_writer.add_scalar("val acc", val_correct, t)
+        tb_writer.add_scalar("learning rate", optimizer.param_groups[0]["lr"], t)
+
         # 把每10个epoch当做一个检查点，保存对应的模型数据，以便后面继续训练。
         if not os.path.exists(MODELS_PATH):
             os.makedirs(MODELS_PATH)
