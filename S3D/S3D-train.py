@@ -161,6 +161,7 @@ if __name__ == '__main__':
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
+    parser.add_argument('--lrf', type=float, default=0.1)
     
     opt = parser.parse_args()
     print(opt)
@@ -184,7 +185,9 @@ if __name__ == '__main__':
     model.train()
     model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    #scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    lf = lambda x: ((1 + math.cos(x * math.pi / opt.num_epochs)) / 2) * (1 - opt.lrf) + opt.lrf  # cosine
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
 
     # 在tensorboard中保存网络模型。
     init_img = torch.zeros((1, 3, 20, 224, 224), device=dev)
