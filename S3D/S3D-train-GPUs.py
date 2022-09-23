@@ -3,23 +3,26 @@ import collections
 import glob
 import json
 import math
+import tempfile
 import os
 from functools import partial
 from multiprocessing import Manager
+from multiprocessing.pool import Pool
 from operator import mod
-from torch.optim import lr_scheduler
 
 import cv2
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.tensorboard import SummaryWriter
+import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn.functional as F
 import yaml
 from progress.bar import ChargingBar
 from torch import optim
-#from multiprocessing.pool import Pool
-from torch.multiprocessing import Pool, set_start_method
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.optim import lr_scheduler
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
@@ -35,6 +38,48 @@ TEST_DIR = os.path.join(DATA_DIR, "test_set")
 MODELS_PATH = "models"
 METADATA_PATH = os.path.join(BASE_DIR, "metadata") # Folder containing all training metadata for DFDC dataset
 VALIDATION_LABELS_PATH = os.path.join(DATA_DIR, "dfdc_val_labels.csv")
+
+# 初始化分布式环境
+def init_distributed_mode(args):
+
+    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        args.rank = int(os.environ["RANK"])
+        args.world_size = int(os.environ['WORLD_SIZE'])
+        args.gpu = int(os.environ['LOCAL_RANK'])
+    elif 'SLURM_PROCID' in os.environ:
+        args.rank = int(os.environ['SLURM_PROCID'])
+        args.gpu = args.rank % torch.cuda.device_count()
+    else:
+        print('Not using distributed mode')
+        args.distributed = False
+        return
+
+    args.distributed = True
+
+    torch.cuda.set_device(args.gpu)
+    args.dist_backend = 'nccl'  # 通信后端，nvidia GPU推荐使用NCCL
+    print('| distributed init (rank {}): {}'.format(
+        args.rank, args.dist_url), flush=True)
+    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                            world_size=args.world_size, rank=args.rank)
+    dist.barrier()
+
+# 将多GPU上的结果取平均值
+def reduce_value(value, average=True):
+
+    if dist.is_available() and dist.is_initialized():
+        world_size = 1
+    else:
+        world_size = dist.get_world_size()
+
+    if world_size < 2:  # 单GPU的情况
+        return value
+
+    with torch.no_grad():
+        dist.all_reduce(value)
+        if average:
+            value /= world_size
+        return value
 
 # 读取视频帧的方法。
 def read_frames(video_path, train_dataset, validation_dataset, config):
@@ -142,8 +187,6 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             validation_dataset.append((snippet, label))
 
 if __name__ == '__main__':
-    # 这个设置可以让masked处理程序可以在dataloader中正确运行，解决了cuda不能在fork的进程中运行的问题。
-    #set_start_method('spawn')
 
     # 读取命令行的参数。
     parser = argparse.ArgumentParser()
@@ -161,7 +204,15 @@ if __name__ == '__main__':
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
-    
+    # 以下是多GPU的参数
+    # 不要改该参数，系统会自动分配
+    parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
+    # 开启的进程数(注意不是线程),在单机中指使用GPU的数量
+   # 开启的进程数(注意不是线程),不用设置该参数，会根据nproc_per_node自动设置
+    parser.add_argument('--world-size', default=4, type=int,
+                        help='number of distributed processes')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+
     opt = parser.parse_args()
     print(opt)
 
@@ -173,31 +224,6 @@ if __name__ == '__main__':
     with open(config_path, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
     print(config)
-
-    tb_writer = SummaryWriter(log_dir="runs/" + opt.config)
-
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # 获得模型和优化器。
-    num_class = 1
-    model = S3D(num_class, config['model']['SRM-net'])
-    model.train()
-    model.to(dev)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
-
-    # 在tensorboard中保存网络模型。
-    init_img = torch.zeros((1, 3, 20, 224, 224), device=dev)
-    tb_writer.add_graph(model, init_img)
-
-    # 如果之前训练在某个点中断，可以从最近的检查点恢复。
-    starting_epoch = 0
-    if os.path.exists(opt.resume):
-        model.load_state_dict(torch.load(opt.resume))
-        starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
-    else:
-        print("No checkpoint loaded.")
-
 
     #READ DATASET
     folders = ["DFDC"]
@@ -230,6 +256,17 @@ if __name__ == '__main__':
                 paths):
                 pbar.update()
 
+    # 初始化分布式环境。
+    init_distributed_mode(args=opt)
+
+    rank = opt.rank
+    dev = torch.device(opt.device)
+    batch_size = config['training']['bs']
+    lr = config['training']['lr'] * opt.world_size  # 学习率要根据并行GPU的数量进行倍增
+
+    if rank == 0:
+        tb_writer = SummaryWriter(log_dir="runs/" + opt.config)
+
     # 得到一些数据集的数据，并将数据集打乱。
     train_samples = len(train_dataset)
     train_dataset = shuffle_dataset(train_dataset)
@@ -237,18 +274,17 @@ if __name__ == '__main__':
     validation_dataset = shuffle_dataset(validation_dataset)
 
     # Print some useful statistics
-    print("Train videos:", len(train_dataset), "Validation videos:", len(validation_dataset))
-    print("__TRAINING STATS__")
     train_counters = collections.Counter(image[1] for image in train_dataset)
-    print(train_counters)
-    
     class_weights = train_counters[0] / train_counters[1]
-    print("Weights", class_weights)
-
-    print("__VALIDATION STATS__")
     val_counters = collections.Counter(image[1] for image in validation_dataset)
-    print(val_counters)
-    print("___________________")
+    if rank == 0:
+        print("Train videos:", len(train_dataset), "Validation videos:", len(validation_dataset))
+        print("__TRAINING STATS__")
+        print(train_counters)
+        print("Weights", class_weights)
+        print("__VALIDATION STATS__")
+        print(val_counters)
+        print("___________________")
 
     # 设置损失函数。
     loss_func = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]).to(dev))
@@ -265,8 +301,11 @@ if __name__ == '__main__':
         config['training']['mask-method'], 
         config['training']['mask-number'],
         config['training']['picture-color'])
-    dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
-                                 batch_sampler=None, num_workers=opt.workers, collate_fn=None,
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    train_batch_sampler = torch.utils.data.BatchSampler(
+        train_sampler, batch_size, drop_last=True)
+    dl = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, 
+                                 num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
@@ -280,18 +319,53 @@ if __name__ == '__main__':
         config['training']['mask-number'],
         config['training']['picture-color'],
         mode='validation')
-    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
+    val_sampler = torch.utils.data.distributed.DistributedSampler(validation_dataset)
+    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, sampler=val_sampler,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,
                                     persistent_workers=False)
     del validation_dataset
 
+    # 获得模型和优化器。
+    num_class = 1
+    model = S3D(num_class, config['model']['SRM-net'])
+    model.to(dev)
+    
+    # 如果之前训练在某个点中断，可以从最近的检查点恢复。
+    starting_epoch = 0
+    if os.path.exists(opt.resume):
+        model.load_state_dict(torch.load(opt.resume, map_location=dev))
+        starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
+    else:
+        checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
+        # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致
+        if rank == 0:
+            print("No checkpoint loaded.")
+            torch.save(model.state_dict(), checkpoint_path)
+
+        dist.barrier()
+        # 这里注意，一定要指定map_location参数，否则会导致第一块GPU占用更多资源
+        model.load_state_dict(torch.load(checkpoint_path, map_location=dev))
+
+    # 在tensorboard中保存网络模型。
+    if rank == 0:
+        init_img = torch.zeros((1, 3, 20, 224, 224), device=dev)
+        tb_writer.add_graph(model, init_img)
+
+    # 转为DDP模型
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(dev)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[opt.gpu])
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=config['training']['weight-decay'])
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+
     # 开始训练。
     counter = 0
     not_improved_loss = 0
     previous_loss = math.inf
     for t in range(starting_epoch, opt.num_epochs + 1):
+        train_sampler.set_epoch(t)
+
         # 如果验证集的loss没有提升的轮次到达设置的值，就提前退出训练。
         if not_improved_loss == opt.patience:
             break
@@ -301,7 +375,8 @@ if __name__ == '__main__':
         total_val_loss = 0
         
         # 设置进度条。
-        bar = ChargingBar('EPOCH #' + str(t), max=(len(dl)*config['training']['bs']+len(val_dl)))
+        if rank == 0:
+            bar = ChargingBar('EPOCH #' + str(t), max=(len(dl)*config['training']['bs']+len(val_dl)))
         train_correct = 0
         positive = 0
         negative = 0
@@ -312,10 +387,11 @@ if __name__ == '__main__':
             images = images.to(dev)
             
             y_pred = model(images)
-            #y_pred = y_pred.cpu()
             
             loss = loss_func(y_pred, labels)
-        
+            loss.backward()
+            loss = reduce_value(loss, average=True)
+
             # 计算正确率和统计训练集数据中的预测（preds）数据。
             # positive_class为预测为1的数量，negative_class为预测为0的数量。
             corrects, positive_class, negative_class = check_correct(y_pred, labels)  
@@ -323,20 +399,23 @@ if __name__ == '__main__':
             positive += positive_class
             negative += negative_class
             
-            loss.backward()
-            
             optimizer.step()
             optimizer.zero_grad()
 
             counter += 1
             total_loss += round(loss.item(), 2)
             
-            if index%1200 == 0: # Intermediate metrics print
-                print("\nLoss: ", total_loss/counter, "Accuracy: ",train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive)
+            if index % 1200 == 0 and rank == 0: # Intermediate metrics print
+                print("\nLoss: ", total_loss/counter, "Accuracy: ",train_correct/(counter*batch_size) ,"Train 0s: ", negative, "Train 1s:", positive)
 
             # 更新进度条。
-            for i in range(config['training']['bs']):
-                bar.next()
+            if rank == 0:
+                for i in range(config['training']['bs']):
+                    bar.next()
+
+        # 等待所有进程计算完毕
+        if dev != torch.device("cpu"):
+            torch.cuda.synchronize(dev)
 
         train_correct /= train_samples
         total_loss /= counter
@@ -354,54 +433,69 @@ if __name__ == '__main__':
                 val_images = val_images.to(dev)
                 val_labels = val_labels.unsqueeze(1).to(dev)
                 val_pred = model(val_images)
-                #val_pred = val_pred.cpu()
 
                 # 统计验证集对应数据。
                 val_loss = loss_func(val_pred, val_labels)
+                val_loss = reduce_value(val_loss, average=True)
                 total_val_loss += round(val_loss.item(), 2)
                 corrects, positive_class, negative_class = check_correct(val_pred, val_labels)
                 val_correct += corrects
                 val_positive += positive_class
                 val_counter += 1
                 val_negative += negative_class
-                bar.next()
+                if rank == 0:
+                    bar.next()
+
+        # 等待所有进程计算完毕
+        if dev != torch.device("cpu"):
+            torch.cuda.synchronize(dev)
 
         # 更新优化器的调度器，并完结进度条。    
         scheduler.step()
-        bar.finish()
+        if rank == 0:
+            bar.finish()
 
         # 计算本次epoch中的验证集损失和正确率。
         # 如果验证集的loss没有提升则对应计数变量+1.    
         total_val_loss /= val_counter
         val_correct /= validation_samples
         if previous_loss <= total_val_loss:
-            print("Validation loss did not improved")
+            if rank == 0:
+                print("Validation loss did not improved")
             not_improved_loss += 1
         else:
             not_improved_loss = 0
         
         # 打印本epoch的训练数据信息。
         previous_loss = total_val_loss
-        print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
-            str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
-    
-        # 在tensorboard中保存本epoch的训练信息
-        tb_writer.add_scalar("train loss", total_loss, t)
-        tb_writer.add_scalar("train acc", train_correct, t)
-        tb_writer.add_scalar("val loss", total_val_loss, t)
-        tb_writer.add_scalar("val acc", val_correct, t)
-        tb_writer.add_scalar("learning rate", optimizer.param_groups[0]["lr"], t)
+        if rank == 0:
+            print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
+                str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
+        
+            # 在tensorboard中保存本epoch的训练信息
+            tb_writer.add_scalar("train loss", total_loss, t)
+            tb_writer.add_scalar("train acc", train_correct, t)
+            tb_writer.add_scalar("val loss", total_val_loss, t)
+            tb_writer.add_scalar("val acc", val_correct, t)
+            tb_writer.add_scalar("learning rate", optimizer.param_groups[0]["lr"], t)
 
-        # 把每10个epoch当做一个检查点，保存对应的模型数据，以便后面继续训练。
-        if not os.path.exists(MODELS_PATH):
-            os.makedirs(MODELS_PATH)
-        if t % 10 == 0:
-            torch.save(model.state_dict(), 
-                os.path.join(MODELS_PATH,  
-                "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
+            # 把每10个epoch当做一个检查点，保存对应的模型数据，以便后面继续训练。
+            if not os.path.exists(MODELS_PATH):
+                os.makedirs(MODELS_PATH)
+            if t % 10 == 0:
+                torch.save(model.state_dict(), 
+                    os.path.join(MODELS_PATH,  
+                    "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
         #exit()
+    
+    # 删除临时缓存文件
+    if rank == 0:
+        tb_writer.close()
+        if os.path.exists(checkpoint_path) is True:
+            os.remove(checkpoint_path)
 
-    tb_writer.close()
+    # 结束分布式环境。
+    dist.destroy_process_group()
 
     # 保存最终模型。
     torch.save(model.state_dict(), 
