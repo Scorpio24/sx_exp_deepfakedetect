@@ -16,6 +16,7 @@ import pandas as pd
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch.multiprocessing import Process
 import torch.nn.functional as F
 import yaml
 from progress.bar import ChargingBar
@@ -68,9 +69,9 @@ def init_distributed_mode(args):
 def reduce_value(value, average=True):
 
     if dist.is_available() and dist.is_initialized():
-        world_size = 1
-    else:
         world_size = dist.get_world_size()
+    else:
+        world_size = 1
 
     if world_size < 2:  # 单GPU的情况
         return value
@@ -186,78 +187,27 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
         else:
             validation_dataset.append((snippet, label))
 
-if __name__ == '__main__':
 
-    # 读取命令行的参数。
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--num_epochs', default=300, type=int,
-                        help='Number of training epochs.')
-    parser.add_argument('--workers', default=1, type=int,
-                        help='Number of data loader workers.')
-    parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                        help='Path to latest checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default='DFDC', 
-                        help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
-    parser.add_argument('--max_videos', type=int, default=-1, 
-                        help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str,
-                        help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--patience', type=int, default=5, 
-                        help="How many epochs wait before stopping for validation loss not improving.")
-    # 以下是多GPU的参数
-    # 不要改该参数，系统会自动分配
-    parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
-    # 开启的进程数(注意不是线程),在单机中指使用GPU的数量
-   # 开启的进程数(注意不是线程),不用设置该参数，会根据nproc_per_node自动设置
-    parser.add_argument('--world-size', default=4, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
 
-    opt = parser.parse_args()
-    print(opt)
+    # 初始化各进程环境 start
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
 
-    if not opt.config:
-        raise Exception("please input name of config file by '--config' .")
+    opt.rank = rank
+    opt.world_size = world_size
+    opt.gpu = rank
 
-    # 读取配置文件。
-    config_path = os.path.join("S3D/configs", opt.config+".yaml")
-    with open(config_path, 'r') as ymlfile:
-        config = yaml.safe_load(ymlfile)
-    print(config)
+    opt.distributed = True
 
-    #READ DATASET
-    folders = ["DFDC"]
-    sets = [TRAINING_DIR, VALIDATION_DIR]
-
-    # 遍历目录和数据集，得到视频的路径，精确到视频目录，具体格式类似为“data\dataset\training_set\DFDC\aagfhgtpmv”。
-    paths = []
-    for dataset in sets:
-        for folder in folders:
-            subfolder = os.path.join(dataset, folder)
-            for _, video_folder_name in enumerate(os.listdir(subfolder)):
-                if os.path.isdir(os.path.join(subfolder, video_folder_name)):
-                    paths.append(os.path.join(subfolder, video_folder_name))
-
-    #for path in paths:
-    #    read_frames(path, [], [], config)
-    
-    # 多进程变量的设置。
-    mgr = Manager()
-    train_dataset = mgr.list()
-    validation_dataset = mgr.list()
-
-    # 使用多进程的方式读取视频帧。
-    with Pool(processes=10) as p:
-        with tqdm(total=len(paths)) as pbar:
-            for v in p.imap_unordered(partial(read_frames, 
-                train_dataset=train_dataset, 
-                validation_dataset=validation_dataset,
-                config=config),
-                paths):
-                pbar.update()
-
-    # 初始化分布式环境。
-    init_distributed_mode(args=opt)
+    torch.cuda.set_device(opt.gpu)
+    opt.dist_backend = 'nccl'
+    print('| distributed init (rank {}): {}'.format(
+        opt.rank, opt.dist_url), flush=True)
+    dist.init_process_group(backend=opt.dist_backend, init_method=opt.dist_url,
+                            world_size=opt.world_size, rank=opt.rank)
+    dist.barrier()
+    # 初始化各进程环境 end
 
     rank = opt.rank
     dev = torch.device(opt.device)
@@ -302,11 +252,10 @@ if __name__ == '__main__':
         config['training']['mask-number'],
         config['training']['picture-color'])
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    train_batch_sampler = torch.utils.data.BatchSampler(
-        train_sampler, batch_size, drop_last=True)
+    train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, batch_size, drop_last=True)
     dl = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, 
                                  num_workers=opt.workers, collate_fn=None,
-                                 pin_memory=False, drop_last=False, timeout=0,
+                                 pin_memory=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
     del train_dataset
@@ -327,7 +276,7 @@ if __name__ == '__main__':
                                     persistent_workers=False)
     del validation_dataset
 
-    # 获得模型和优化器。
+    # 获得模型。
     num_class = 1
     model = S3D(num_class, config['model']['SRM-net'])
     model.to(dev)
@@ -357,29 +306,30 @@ if __name__ == '__main__':
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(dev)
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[opt.gpu])
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=config['training']['weight-decay'])
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    #scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    lf = lambda x: ((1 + math.cos(x * math.pi / opt.num_epochs)) / 2) * (1 - opt.lrf) + opt.lrf  # cosine
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
 
     # 开始训练。
-    counter = 0
-    not_improved_loss = 0
-    previous_loss = math.inf
+    not_improved_loss = torch.zeros(1).to(dev)
+    previous_loss = torch.tensor([math.inf]).to(dev)
     for t in range(starting_epoch, opt.num_epochs + 1):
         train_sampler.set_epoch(t)
 
         # 如果验证集的loss没有提升的轮次到达设置的值，就提前退出训练。
-        if not_improved_loss == opt.patience:
+        if not_improved_loss.item() == opt.patience:
             break
-        counter = 0
+        counter = torch.zeros(1).to(dev)
 
-        total_loss = 0
-        total_val_loss = 0
+        total_loss = torch.zeros(1).to(dev)
+        total_val_loss = torch.zeros(1).to(dev)
         
         # 设置进度条。
         if rank == 0:
             bar = ChargingBar('EPOCH #' + str(t), max=(len(dl)*config['training']['bs']+len(val_dl)))
-        train_correct = 0
-        positive = 0
-        negative = 0
+        train_correct = torch.zeros(1).to(dev)
+        positive = torch.zeros(1).to(dev)
+        negative = torch.zeros(1).to(dev)
         # 训练集训练。
         model.train()
         for index, (images, labels) in enumerate(dl):
@@ -405,8 +355,8 @@ if __name__ == '__main__':
             counter += 1
             total_loss += round(loss.item(), 2)
             
-            if index % 1200 == 0 and rank == 0: # Intermediate metrics print
-                print("\nLoss: ", total_loss/counter, "Accuracy: ",train_correct/(counter*batch_size) ,"Train 0s: ", negative, "Train 1s:", positive)
+            #if index % 1200 == 0 and rank == 0: # Intermediate metrics print
+            #    print("\nLoss: ", total_loss/counter, "Accuracy: ",train_correct/(counter*batch_size) ,"Train 0s: ", negative, "Train 1s:", positive)
 
             # 更新进度条。
             if rank == 0:
@@ -417,17 +367,23 @@ if __name__ == '__main__':
         if dev != torch.device("cpu"):
             torch.cuda.synchronize(dev)
 
+        dist.all_reduce(train_correct)
         train_correct /= train_samples
+        dist.all_reduce(total_loss)
+        dist.all_reduce(counter)
         total_loss /= counter
 
+        # 更新优化器的调度器。    
+        scheduler.step()
+
         # 设置验证集统计数据。
-        val_correct = 0
-        val_positive = 0
-        val_negative = 0
-        val_counter = 0
+        val_correct = torch.zeros(1).to(dev)
+        val_positive = torch.zeros(1).to(dev)
+        val_negative = torch.zeros(1).to(dev)
+        val_counter = torch.zeros(1).to(dev)
         
         # 验证集预测。
-        model.eval()
+        #model.eval()
         with torch.no_grad():
             for index, (val_images, val_labels) in enumerate(val_dl):
                 val_images = val_images.to(dev)
@@ -450,33 +406,40 @@ if __name__ == '__main__':
         if dev != torch.device("cpu"):
             torch.cuda.synchronize(dev)
 
-        # 更新优化器的调度器，并完结进度条。    
-        scheduler.step()
+        # 完结进度条
         if rank == 0:
             bar.finish()
 
         # 计算本次epoch中的验证集损失和正确率。
-        # 如果验证集的loss没有提升则对应计数变量+1.    
+        # 如果验证集的loss没有提升则对应计数变量+1.   
+        dist.all_reduce(total_val_loss)
+        dist.all_reduce(val_counter) 
         total_val_loss /= val_counter
+        dist.all_reduce(val_correct)
         val_correct /= validation_samples
         if previous_loss <= total_val_loss:
             if rank == 0:
                 print("Validation loss did not improved")
             not_improved_loss += 1
         else:
-            not_improved_loss = 0
+            not_improved_loss.zero_()
         
         # 打印本epoch的训练数据信息。
         previous_loss = total_val_loss
+        dist.all_reduce(val_negative)
+        dist.all_reduce(val_positive)
         if rank == 0:
-            print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
-                str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
+            print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +str(total_loss.item()) + 
+                " accuracy:" + str(train_correct.item()) +" val_loss:" + str(total_val_loss.item()) + 
+                " val_accuracy:" + str(val_correct.item()) + 
+                " val_0s:" + str(val_negative.item()) + "/" + str(np.count_nonzero(validation_labels == 0)) + 
+                " val_1s:" + str(val_positive.item()) + "/" + str(np.count_nonzero(validation_labels == 1)))
         
             # 在tensorboard中保存本epoch的训练信息
-            tb_writer.add_scalar("train loss", total_loss, t)
-            tb_writer.add_scalar("train acc", train_correct, t)
-            tb_writer.add_scalar("val loss", total_val_loss, t)
-            tb_writer.add_scalar("val acc", val_correct, t)
+            tb_writer.add_scalar("train loss", total_loss.item(), t)
+            tb_writer.add_scalar("train acc", train_correct.item(), t)
+            tb_writer.add_scalar("val loss", total_val_loss.item(), t)
+            tb_writer.add_scalar("val acc", val_correct.item(), t)
             tb_writer.add_scalar("learning rate", optimizer.param_groups[0]["lr"], t)
 
             # 把每10个epoch当做一个检查点，保存对应的模型数据，以便后面继续训练。
@@ -493,11 +456,93 @@ if __name__ == '__main__':
         tb_writer.close()
         if os.path.exists(checkpoint_path) is True:
             os.remove(checkpoint_path)
+        
+        # 保存最终模型。
+        torch.save(model.state_dict(), 
+            os.path.join(MODELS_PATH, "final_models",  "S3D_final_" + opt.dataset + "_" + opt.config))
 
     # 结束分布式环境。
     dist.destroy_process_group()
 
-    # 保存最终模型。
-    torch.save(model.state_dict(), 
-        os.path.join(MODELS_PATH, 
-        "final_models",  "S3D_final_" + opt.dataset + "_" + opt.config))
+
+if __name__ == '__main__':
+
+    # 读取命令行的参数。
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--num_epochs', default=300, type=int,
+                        help='Number of training epochs.')
+    parser.add_argument('--workers', default=1, type=int,
+                        help='Number of data loader workers.')
+    parser.add_argument('--resume', default='', type=str, metavar='PATH',
+                        help='Path to latest checkpoint (default: none).')
+    parser.add_argument('--dataset', type=str, default='DFDC', 
+                        help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
+    parser.add_argument('--max_videos', type=int, default=-1, 
+                        help="Maximum number of videos to use for training (default: all).")
+    parser.add_argument('--config', type=str,
+                        help="Which configuration to use. See into 'config' folder.")
+    parser.add_argument('--patience', type=int, default=5, 
+                        help="How many epochs wait before stopping for validation loss not improving.")
+    parser.add_argument('--lrf', type=float, default=0.1)
+    # 以下是多GPU的参数
+    # 不要改该参数，系统会自动分配
+    parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
+    # 开启的进程数(注意不是线程),在单机中指使用GPU的数量
+    parser.add_argument('--world-size', default=2, type=int,
+                        help='number of distributed processes')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+    
+    opt = parser.parse_args()
+    print(opt)
+
+    if not opt.config:
+        raise Exception("please input name of config file by '--config' .")
+
+    # 读取配置文件。
+    config_path = os.path.join("S3D/configs", opt.config+".yaml")
+    with open(config_path, 'r') as ymlfile:
+        config = yaml.safe_load(ymlfile)
+    print(config)
+
+    #READ DATASET
+    folders = ["DFDC"]
+    sets = [TRAINING_DIR, VALIDATION_DIR]
+
+    # 遍历目录和数据集，得到视频的路径，精确到视频目录，具体格式类似为“data\dataset\training_set\DFDC\aagfhgtpmv”。
+    paths = []
+    for dataset in sets:
+        for folder in folders:
+            subfolder = os.path.join(dataset, folder)
+            for _, video_folder_name in enumerate(os.listdir(subfolder)):
+                if os.path.isdir(os.path.join(subfolder, video_folder_name)):
+                    paths.append(os.path.join(subfolder, video_folder_name))
+
+    #for path in paths:
+    #    read_frames(path, [], [], config)
+    
+    # 多进程变量的设置。
+    mgr = Manager()
+    train_dataset = mgr.list()
+    validation_dataset = mgr.list()
+
+    # 使用多进程的方式读取视频帧。
+    #with Pool(processes=10) as p:
+    p = Pool(processes=10)
+    with tqdm(total=len(paths)) as pbar:
+        for v in p.imap_unordered(partial(read_frames, 
+            train_dataset=train_dataset, 
+            validation_dataset=validation_dataset,
+            config=config),
+            paths):
+            pbar.update()
+    p.close()
+    p.join()
+
+    world_size = opt.world_size
+    processes = []
+    for rank in range(world_size):
+        p = Process(target=fit, args=(rank, world_size, opt, config, train_dataset, validation_dataset))
+        p.start()
+        processes.append(p)
+    for p in processes:
+        p.join()
