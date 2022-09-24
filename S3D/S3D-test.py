@@ -86,7 +86,7 @@ def save_roc_curves(correct_labels, preds, model_name, accuracy, loss, f1):
   plt.savefig(os.path.join(OUTPUT_DIR, model_name +  "_" + opt.dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
   plt.clf()
 
-def read_frames(video_path, videos):
+def read_frames(video_path, videos, opt, config):
     
     # Get the video label based on dataset selected
     method = get_method(video_path, DATA_DIR)
@@ -150,13 +150,13 @@ if __name__ == "__main__":
     
     parser.add_argument('--workers', default=10, type=int,
                         help='Number of data loader workers.')
-    parser.add_argument('--model_path', default="models/final_models/S3D_final_DFDC", type=str, metavar='PATH',
+    parser.add_argument('--model_path', default="S3D_final_DFDC_plan1", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
     parser.add_argument('--dataset', type=str, default='DFDC', 
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|DFDC)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str, default="S3D/configs/architecture.yaml",
+    parser.add_argument('--config', type=str, default="S3D/configs/plan1.yaml",
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--efficient_net', type=int, default=0, 
                         help="Which EfficientNet version to use (0 or 7, default: 0)")
@@ -173,15 +173,24 @@ if __name__ == "__main__":
 
     dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
+    opt.model_path = os.path.join("models/final_models", opt.model_path)
     if os.path.exists(opt.model_path):
-        num_class = 1
-        model = S3D(num_class)
-        model.load_state_dict(torch.load(opt.model_path))
-        model.eval()
-        model = model.to(dev)
+        state_dict = torch.load(opt.model_path, map_location=dev)
+        # create new OrderedDict that does not contain `module.`
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            name = k.lstrip("module.") # remove `module.`
+            new_state_dict[name] = v
     else:
         print("No model found.")
         exit()
+
+    num_class = 1
+    model = S3D(num_class, config['model']['SRM-net'])
+    model.load_state_dict(new_state_dict)
+    model.eval()
+    model = model.to(dev)
 
     model_name = os.path.basename(opt.model_path)
 
@@ -209,7 +218,7 @@ if __name__ == "__main__":
       
     with Pool(processes=opt.workers) as p:
         with tqdm(total=len(paths)) as pbar:
-            for v in p.imap_unordered(partial(read_frames, videos=videos),paths):
+            for v in p.imap_unordered(partial(read_frames, videos=videos, opt=opt, config=config),paths):
                 pbar.update()
 
     video_names = np.asarray([row[2] for row in videos])
@@ -230,6 +239,7 @@ if __name__ == "__main__":
         video_faces = video_faces.to(dev).float()
         
         pred = model(video_faces)
+        print(pred)
         
         scaled_pred = []
         for idx, p in enumerate(pred):
