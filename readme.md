@@ -32,10 +32,7 @@
 
     python3 ./S3D/S3D-train.py --config plan1
 
-添加了多GPU训练的代码 S3D\S3D-train-GPUs.py。运行参数如下：
-
-    python -m torch.distributed.launch --nproc_per_node=1 --use_env S3D/S3D-train-GPUs.py --config plan1
-其中nproc_per_node为并行GPU的数量。
+添加了多GPU训练的代码 S3D\S3D-train-GPUs.py。运行参数与单GPU相同。
 ## 注意事项
 1. 实验中使用的albumentations库为新版本，而根据参考项目的environment.yml文件创建的环境中albumentations库为老版本，所以需要用如下命令升级：
 
