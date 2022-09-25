@@ -383,7 +383,7 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
         val_counter = torch.zeros(1).to(dev)
         
         # 验证集预测。
-        #model.eval()
+        model.eval()
         with torch.no_grad():
             for index, (val_images, val_labels) in enumerate(val_dl):
                 val_images = val_images.to(dev)
