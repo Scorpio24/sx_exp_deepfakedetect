@@ -239,7 +239,6 @@ if __name__ == "__main__":
         video_faces = video_faces.to(dev).float()
         
         pred = model(video_faces)
-        print(pred)
         
         scaled_pred = []
         for idx, p in enumerate(pred):

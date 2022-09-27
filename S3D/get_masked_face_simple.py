@@ -18,7 +18,7 @@ def get_masked_face_simple(input_img, random_list, mask_method, mask_number):
         raise Exception("mask_number should be in range(0, 9). \
                         Now mask_number is {}".format(mask_number))
 
-    detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cpu")
+    detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cuda")
     _, _, landmarks = detector.detect(input_img, landmarks=True)
     if landmarks is None:
         return input_img
