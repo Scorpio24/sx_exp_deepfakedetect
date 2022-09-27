@@ -201,7 +201,7 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
     opt.distributed = True
 
     torch.cuda.set_device(opt.gpu)
-    opt.dist_backend = 'nccl'
+    opt.dist_backend = 'gloo'
     print('| distributed init (rank {}): {}'.format(
         opt.rank, opt.dist_url), flush=True)
     dist.init_process_group(backend=opt.dist_backend, init_method=opt.dist_url,
@@ -469,9 +469,9 @@ if __name__ == '__main__':
 
     # 读取命令行的参数。
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_epochs', default=300, type=int,
+    parser.add_argument('--num_epochs', default=400, type=int,
                         help='Number of training epochs.')
-    parser.add_argument('--workers', default=1, type=int,
+    parser.add_argument('--workers', default=8, type=int,
                         help='Number of data loader workers.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
@@ -481,7 +481,7 @@ if __name__ == '__main__':
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--patience', type=int, default=5, 
+    parser.add_argument('--patience', type=int, default=7, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--lrf', type=float, default=0.1)
     # 以下是多GPU的参数
