@@ -8,3 +8,4 @@ models
 *.png
 .vscode
 runs
+temp

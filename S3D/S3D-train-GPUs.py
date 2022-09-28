@@ -183,9 +183,9 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             snippet.append(image)
     if len(snippet) != 0:
         if TRAINING_DIR in video_path:
-            train_dataset.append((snippet, label))
+            train_dataset.append((snippet, label, os.path.basename(video_path)))
         else:
-            validation_dataset.append((snippet, label))
+            validation_dataset.append((snippet, label, os.path.basename(video_path)))
 
 
 def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
@@ -241,16 +241,22 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
 
     # Create the data loaders
     validation_labels = np.asarray([row[1] for row in validation_dataset])
+    validation_video_name = np.asarray([row[2] for row in validation_dataset])
     labels = np.asarray([row[1] for row in train_dataset])
+    train_video_name = np.asarray([row[2] for row in train_dataset])
 
+    tempdir = tempfile.gettempdir()
     # 创建对应的dataset和dataloader。
     train_dataset = DeepFakesDataset(
         np.asarray([row[0] for row in train_dataset]), 
         labels, 
+        train_video_name,
+        tempdir,
         config['model']['image-size'], 
         config['training']['mask-method'], 
         config['training']['mask-number'],
-        config['training']['picture-color'])
+        config['training']['picture-color'],
+        config['training']['aug'])
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, batch_size, drop_last=True)
     dl = torch.utils.data.DataLoader(train_dataset, batch_sampler=train_batch_sampler, 
@@ -262,11 +268,14 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
 
     validation_dataset = DeepFakesDataset(
         np.asarray([row[0] for row in validation_dataset]), 
-        validation_labels, 
+        validation_labels,
+        validation_video_name, 
+        tempdir,
         config['model']['image-size'], 
         config['training']['mask-method'], 
         config['training']['mask-number'],
         config['training']['picture-color'],
+        config['training']['aug'],
         mode='validation')
     val_sampler = torch.utils.data.distributed.DistributedSampler(validation_dataset)
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, sampler=val_sampler,
@@ -287,7 +296,7 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
         model.load_state_dict(torch.load(opt.resume, map_location=dev))
         starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
     else:
-        checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
+        checkpoint_path = os.path.join(tempdir, "initial_weights.pt")
         # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致
         if rank == 0:
             print("No checkpoint loaded.")
@@ -457,6 +466,12 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
         if os.path.exists(checkpoint_path) is True:
             os.remove(checkpoint_path)
         
+        for video_name in train_video_name:
+            for i in range(21):
+                tempfilename = os.path.join(tempdir, video_name+"_"+str(i)+".npy")
+                if os.path.exists(tempfilename) is True:
+                    os.remove(tempfilename)
+
         # 保存最终模型。
         torch.save(model.state_dict(), 
             os.path.join(MODELS_PATH, "final_models",  "S3D_final_" + opt.dataset + "_" + opt.config))

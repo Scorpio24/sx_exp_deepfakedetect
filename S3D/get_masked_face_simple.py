@@ -1,5 +1,6 @@
 import math
 import random
+import os
 
 import cv2
 from facenet_pytorch.models.mtcnn import MTCNN
@@ -9,7 +10,7 @@ import numpy as np
 # 输入图片，得到对应的掩码处理后的结果。
 # 图片格式为cv2读取后的格式，shape为（H，W，C），颜色通道顺序为CV2的BGR（这个没什么关系）。
 # mask_method='black' or 'noise'，前者为黑色填充，后者为高斯噪声填充。
-def get_masked_face_simple(input_img, random_list, mask_method, mask_number):
+def get_masked_face_simple(input_img, tempdir, img_id, random_list, mask_method, mask_number):
 
     if mask_method not in ['black', 'noise']:
         raise Exception("Mask_method should be 'black' or 'noise'. \
@@ -18,8 +19,26 @@ def get_masked_face_simple(input_img, random_list, mask_method, mask_number):
         raise Exception("mask_number should be in range(0, 9). \
                         Now mask_number is {}".format(mask_number))
 
-    detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cuda")
-    _, _, landmarks = detector.detect(input_img, landmarks=True)
+    # 将每张图片的landmark存入临时文件
+    # 后续训练过程中如果已存在对应的landmark，则直接读取而不是重新检测。
+    # 用于提高训练速度。
+    tempfile_path = os.path.join(tempdir, img_id+".npy")
+    landmarks = None
+    if os.path.exists(tempfile_path) is True:
+        try:
+            landmarks = np.load(tempfile_path).tolist()
+        except Exception as e:
+            print("Load Mask Landmarks Error: ", e)
+            landmarks = None
+            os.remove(tempfile_path)
+    else:
+        detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cpu")
+        _, _, landmarks = detector.detect(input_img, landmarks=True)
+        if landmarks is None:
+            return input_img
+        with open(tempfile_path, 'wb') as f:
+            np.save(f, landmarks)
+
     if landmarks is None:
         return input_img
     hight = input_img.shape[0]
@@ -86,15 +105,15 @@ def get_masked_face_simple(input_img, random_list, mask_method, mask_number):
 if __name__ == '__main__':
     import yaml
     # 读取配置文件。
-    with open("S3D/configs/architecture.yaml", 'r') as ymlfile:
+    with open("S3D/configs/plan3.yaml", 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
     #读取图片。
-    img_path = "aug_frames/0c93d0e8-0e55-4a16-acfb-a96cf93b6f68_452.png"
+    img_path = "1_0.png"
     input_img = cv2.imread(img_path)
     random_list = [i for i in range(0, 8)]
     random.shuffle(random_list)
-    masked = get_masked_face_simple(input_img, random_list, config['training']['mask-method'], config['training']['mask-number'])
-    masked = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
+    masked = get_masked_face_simple(input_img, "./temp", "1_1", random_list, config['training']['mask-method'], config['training']['mask-number'])
+    #masked = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
     cv2.imshow('masked', masked)
     cv2.waitKey(0)

@@ -10,6 +10,7 @@ training:
   mask-method: 'none' # 'black', 'noise' or 'none'
   mask-number: 6 # range(0, 9)
   picture-color: 'gray' # 'rgb' or 'gray'
+  aug: 'no' # if use aug
 
 model:
   image-size: 224

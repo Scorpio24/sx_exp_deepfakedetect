@@ -3,6 +3,7 @@ import collections
 import glob
 import json
 import math
+import tempfile
 import os
 from functools import partial
 from multiprocessing import Manager
@@ -137,13 +138,11 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             snippet.append(image)
     if len(snippet) != 0:
         if TRAINING_DIR in video_path:
-            train_dataset.append((snippet, label))
+            train_dataset.append((snippet, label, os.path.basename(video_path)))
         else:
-            validation_dataset.append((snippet, label))
+            validation_dataset.append((snippet, label, os.path.basename(video_path)))
 
 if __name__ == '__main__':
-    # 这个设置可以让masked处理程序可以在dataloader中正确运行，解决了cuda不能在fork的进程中运行的问题。
-    #set_start_method('spawn')
 
     # 读取命令行的参数。
     parser = argparse.ArgumentParser()
@@ -157,7 +156,7 @@ if __name__ == '__main__':
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str,
+    parser.add_argument('--config', type=str,default="plan3",
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--patience', type=int, default=7, 
                         help="How many epochs wait before stopping for validation loss not improving.")
@@ -258,16 +257,22 @@ if __name__ == '__main__':
 
     # Create the data loaders
     validation_labels = np.asarray([row[1] for row in validation_dataset])
+    validation_video_name = np.asarray([row[2] for row in validation_dataset])
     labels = np.asarray([row[1] for row in train_dataset])
+    train_video_name = np.asarray([row[2] for row in train_dataset])
 
+    tempdir = tempfile.gettempdir()
     # 创建对应的dataset和dataloader。
     train_dataset = DeepFakesDataset(
         np.asarray([row[0] for row in train_dataset]), 
         labels, 
+        train_video_name,
+        tempdir,
         config['model']['image-size'], 
         config['training']['mask-method'], 
         config['training']['mask-number'],
-        config['training']['picture-color'])
+        config['training']['picture-color'],
+        config['training']['aug'])
     dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -277,11 +282,14 @@ if __name__ == '__main__':
 
     validation_dataset = DeepFakesDataset(
         np.asarray([row[0] for row in validation_dataset]), 
-        validation_labels, 
+        validation_labels,
+        validation_video_name, 
+        tempdir,
         config['model']['image-size'], 
         config['training']['mask-method'], 
         config['training']['mask-number'],
         config['training']['picture-color'],
+        config['training']['aug'],
         mode='validation')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
@@ -405,6 +413,12 @@ if __name__ == '__main__':
         #exit()
 
     tb_writer.close()
+
+    for video_name in train_video_name:
+        for i in range(21):
+            tempfilename = os.path.join(tempdir, video_name+"_"+str(i)+".npy")
+            if os.path.exists(tempfilename) is True:
+                os.remove(tempfilename)
 
     # 保存最终模型。
     torch.save(model.state_dict(), 
