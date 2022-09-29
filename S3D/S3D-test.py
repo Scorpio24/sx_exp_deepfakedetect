@@ -1,38 +1,39 @@
-import matplotlib.pyplot as plt
-from sklearn import metrics
-from sklearn.metrics import auc
-from sklearn.metrics import accuracy_score
+import argparse
+from cProfile import label
+import glob
+import json
 import os
+import tempfile
+import random
+from functools import partial
+from multiprocessing import Manager
+from multiprocessing.pool import Pool
+from os import cpu_count
+
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
-from torch import nn, einsum
-
-from sklearn.metrics import f1_score
-from albumentations import Compose, RandomBrightnessContrast, \
-    HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, \
-    ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate
-
-from transforms.albu import IsotropicResize
-
-from utils import get_method, check_correct, resize, shuffle_dataset, get_n_params
 import torch.nn as nn
 import torch.nn.functional as F
-from functools import partial
-from utils import transform_frame
-import glob
-from os import cpu_count
-import json
-from multiprocessing.pool import Pool
-from progress.bar import Bar
-import pandas as pd
-from tqdm import tqdm
-from multiprocessing import Manager
-from utils import custom_round, custom_video_round
-from model import S3D
 import yaml
-import argparse
+from albumentations import (Compose, FancyPCA, GaussianBlur, GaussNoise,
+                            HorizontalFlip, HueSaturationValue,
+                            ImageCompression, OneOf, PadIfNeeded,
+                            RandomBrightnessContrast, Rotate, ShiftScaleRotate,
+                            ToGray)
+from progress.bar import Bar
+from sklearn import metrics
+from sklearn.metrics import accuracy_score, auc, f1_score
+from torch import einsum, nn
+from tqdm import tqdm
+from get_masked_face_simple import get_masked_face_simple
 
+from model import S3D
+from transforms.albu import IsotropicResize
+from utils import (check_correct, custom_round, custom_video_round, get_method,
+                   get_n_params, resize, shuffle_dataset, transform_frame)
 
 MODELS_DIR = "models"
 BASE_DIR = "./data"
@@ -56,8 +57,22 @@ def create_base_transform(size):
         PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
     ])
 
-def snippet_transform(videos):
+def snippet_transform(videos, name, config):
     video = list(map(np.asarray, videos))
+
+    if config['training']['mask-method'] != 'none':
+        # 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
+        random_list = [i for i in range(0, 8)]
+        random.shuffle(random_list)
+        for i in range(0, len(videos)):
+            videos[i] = get_masked_face_simple(
+                            videos[i],
+                            tempdir,
+                            name + "_" + str(i),
+                            random_list=random_list, 
+                            mask_method=config['training']['mask-method'], 
+                            mask_number=config['training']['mask-number'])
+
             
     #unique = uuid.uuid4()
     #cv2.imwrite("data/dataset/aug_frames/"+str(unique)+"_"+str(index)+".png", video[0])
@@ -105,6 +120,7 @@ def read_frames(video_path, videos, opt, config):
     frames_number = len(os.listdir(video_path))
     frames_interval = int(frames_number / opt.frames_per_video)
     frames_paths = os.listdir(video_path)
+    frames_paths.sort(key=lambda x:int(x.split('_')[0]))
     frames_paths_dict = {}
 
     # Group the faces with the same index, reduce probabiity to skip some faces in the same video
@@ -156,7 +172,7 @@ if __name__ == "__main__":
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|DFDC)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str, default="S3D/configs/plan1.yaml",
+    parser.add_argument('--config', type=str, default="plan3",
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--efficient_net', type=int, default=0, 
                         help="Which EfficientNet version to use (0 or 7, default: 0)")
@@ -168,8 +184,14 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
 
-    with open(opt.config, 'r') as ymlfile:
+    if not opt.config:
+        raise Exception("please input name of config file by '--config' .")
+
+    # 读取配置文件。
+    config_path = os.path.join("S3D/configs", opt.config+".yaml")
+    with open(config_path, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
+    print(config)
 
     dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -226,6 +248,8 @@ if __name__ == "__main__":
     videos = [row[0] for row in videos]
     preds = []
 
+    tempdir = tempfile.gettempdir()
+
     bar = Bar('Predicting', max=len(videos))
 
     f = open(opt.dataset + "_" + model_name + "_labels.txt", "w+")
@@ -235,7 +259,7 @@ if __name__ == "__main__":
         f.write(video_name)
         #for key in video:
         faces_preds = []
-        video_faces = snippet_transform(video)
+        video_faces = snippet_transform(video, os.path.basename(video_name), config)
         video_faces = video_faces.to(dev).float()
         
         pred = model(video_faces)
@@ -275,3 +299,9 @@ if __name__ == "__main__":
     f1 = f1_score(correct_test_labels, custom_round(np.asarray(preds)))
     print(model_name, "Test Accuracy:", accuracy, "Loss:", loss, "F1", f1)
     save_roc_curves(correct_test_labels, preds, model_name, accuracy, loss, f1)
+
+    for video_name in video_names:
+        for i in range(21):
+            tempfilename = os.path.join(tempdir, os.path.basename(video_name)+"_"+str(i)+".npy")
+            if os.path.exists(tempfilename) is True:
+                os.remove(tempfilename)

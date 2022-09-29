@@ -9,3 +9,5 @@ models
 .vscode
 runs
 temp
+other-module
+clearPicture.py

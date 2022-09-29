@@ -149,6 +149,7 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
         min_video_frames = int(max(min_video_frames/8, 2))
     frames_interval = int(frames_number / min_video_frames)
     frames_paths = os.listdir(video_path)
+    frames_paths.sort(key=lambda x:int(x.split('_')[0]))
     frames_paths_dict = {}
 
     # 当视频中有多个人脸时，处理得到的视频帧会以"*_0.png"和"*_1.png"的形式出现。
