@@ -40,7 +40,7 @@ BASE_DIR = "./data"
 DATA_DIR = os.path.join(BASE_DIR, "dataset")
 TEST_DIR = os.path.join(DATA_DIR, "test_set")
 OUTPUT_DIR = os.path.join(MODELS_DIR, "tests")
-
+METADATA_PATH = os.path.join(BASE_DIR, "metadata") # Folder containing all training metadata for DFDC dataset
 TEST_LABELS_PATH = os.path.join(BASE_DIR, "dataset/dfdc_test_labels.csv")
 
 
@@ -108,10 +108,26 @@ def read_frames(video_path, videos, opt, config):
     if "Original" in video_path:
         label = 0.
     elif method == "DFDC":
-        test_df = pd.DataFrame(pd.read_csv(TEST_LABELS_PATH))
-        video_folder_name = os.path.basename(video_path)
-        video_key = video_folder_name + ".mp4"
-        label = test_df.loc[test_df['filename'] == video_key]['label'].values[0]
+        for json_path in glob.glob(os.path.join(METADATA_PATH, "*.json")):
+            with open(json_path, "r") as f:
+                metadata = json.load(f)
+            video_folder_name = os.path.basename(video_path)
+            video_key = video_folder_name + ".mp4"
+            if video_key in metadata.keys():
+                item = metadata[video_key]
+                label = item.get("label", None)
+                if label == "FAKE":
+                    label = 1.0   
+                else:
+                    label = 0.0
+                break
+            else:
+                label = None
+                print("NOT FOUND", video_path)
+        # test_df = pd.DataFrame(pd.read_csv(TEST_LABELS_PATH))
+        # video_folder_name = os.path.basename(video_path)
+        # video_key = video_folder_name + ".mp4"
+        # label = test_df.loc[test_df['filename'] == video_key]['label'].values[0]
     else:
         label = 1.
     
