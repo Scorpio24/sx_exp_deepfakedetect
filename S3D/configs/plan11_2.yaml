@@ -8,7 +8,7 @@ training:
   rebalancing_real: 1
   frames-per-video: 30 # Equidistant frames
   mask-method: 'black' # 'black', 'noise' or 'none'
-  mask-number: 6 # range(0, 9)
+  mask-number: 8 # range(0, 9)
   picture-color: 'rgb' # 'rgb' or 'gray'
   aug: 'no' # if use aug
 
