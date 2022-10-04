@@ -9,9 +9,9 @@ from new_model.Conv3d import SepConv3d
 from new_model.Conv3d import BasicConv3d
 from new_model.iformer_3d import iFormerBlock
 
-class S3D(nn.Module):
+class msca_S3D(nn.Module):
     def __init__(self, num_class, SRM_net):
-        super(S3D, self).__init__()
+        super(msca_S3D, self).__init__()
 
         self.SRM_net = SRM_net
         if SRM_net == 'yes':
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     from torchsummary import summary
     from thop import profile, clever_format
     
-    model = S3D(1, 'yes')
+    model = msca_S3D(1, 'yes')
     #summary(model, (3, 20, 224, 224), batch_size=11, device='cpu')
 
     # model = testmodel()

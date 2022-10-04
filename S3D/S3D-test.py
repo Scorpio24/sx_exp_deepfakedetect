@@ -1,5 +1,4 @@
 import argparse
-from cProfile import label
 import glob
 import json
 import os
@@ -8,32 +7,23 @@ import random
 from functools import partial
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
-from os import cpu_count
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import yaml
-from albumentations import (Compose, FancyPCA, GaussianBlur, GaussNoise,
-                            HorizontalFlip, HueSaturationValue,
-                            ImageCompression, OneOf, PadIfNeeded,
-                            RandomBrightnessContrast, Rotate, ShiftScaleRotate,
-                            ToGray)
+from albumentations import (Compose, PadIfNeeded)
 from progress.bar import Bar
 from sklearn import metrics
 from sklearn.metrics import accuracy_score, auc, f1_score
-from torch import einsum, nn
 from tqdm import tqdm
 from get_masked_face_simple import get_masked_face_simple
 
 from model import S3D
+from msca_S3D import msca_S3D
 from transforms.albu import IsotropicResize
-from utils import (check_correct, custom_round, custom_video_round, get_method,
-                   get_n_params, resize, shuffle_dataset, transform_frame)
+from utils import (custom_round, custom_video_round, get_method)
 
 MODELS_DIR = "models"
 BASE_DIR = "./data"
@@ -61,7 +51,6 @@ def snippet_transform(videos, name, config):
     video = list(map(np.asarray, videos))
 
     if config['training']['mask-method'] != 'none':
-        # 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
         random_list = [i for i in range(0, 8)]
         random.shuffle(random_list)
         for i in range(0, len(videos)):
@@ -98,16 +87,21 @@ def save_roc_curves(correct_labels, preds, model_name, accuracy, loss, f1):
   plt.ylabel('True positive rate')
   plt.title('ROC curve')
   plt.legend(loc='best')
-  plt.savefig(os.path.join(OUTPUT_DIR, model_name +  "_" + opt.dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
+
+  output_dir = os.path.join(OUTPUT_DIR, model_name)
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+  plt.savefig(os.path.join(output_dir, opt.dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
   plt.clf()
 
 def read_frames(video_path, videos, opt, config):
     
     # Get the video label based on dataset selected
-    method = get_method(video_path, DATA_DIR)
+    #method = get_method(video_path, DATA_DIR)
     if "Original" in video_path:
         label = 0.
-    elif method == "DFDC":
+    #elif method == "DFDC":
+    elif "DFDC" in video_path:
         for json_path in glob.glob(os.path.join(METADATA_PATH, "*.json")):
             with open(json_path, "r") as f:
                 metadata = json.load(f)
@@ -131,10 +125,7 @@ def read_frames(video_path, videos, opt, config):
     else:
         label = 1.
     
-
-    # Calculate the interval to extract the frames
-    frames_number = len(os.listdir(video_path))
-    frames_interval = int(frames_number / opt.frames_per_video)
+    # 得到视频的人脸帧图像，并且按照视频顺序排序。
     frames_paths = os.listdir(video_path)
     frames_paths.sort(key=lambda x:int(x.split('_')[0]))
     frames_paths_dict = {}
@@ -148,31 +139,17 @@ def read_frames(video_path, videos, opt, config):
                 else:
                     frames_paths_dict[i].append(path)
 
-    # Select only the frames at a certain interval
-    # if frames_interval > 0:
-    #     for key in frames_paths_dict.keys():
-    #         if len(frames_paths_dict) > frames_interval:
-    #             frames_paths_dict[key] = frames_paths_dict[key][::frames_interval]
-            
-    #         frames_paths_dict[key] = frames_paths_dict[key][:opt.frames_per_video]
-
     # Select N frames from the collected ones
-    video = {}
     snippet = []
     transform = create_base_transform(config['model']['image-size'])
     for key in frames_paths_dict.keys():
         if len(frames_paths_dict[key]) < 20:
             continue
         frames_paths_dict[key] = frames_paths_dict[key][:20]
-        for index, frame_image in enumerate(frames_paths_dict[key]):
-            #image = np.asarray(resize(cv2.imread(os.path.join(video_path, frame_image)), IMAGE_SIZE))
+        for _, frame_image in enumerate(frames_paths_dict[key]):
             image = transform(image=cv2.imread(os.path.join(video_path, frame_image)))['image']
             snippet.append(image)
     if len(snippet) > 0:
-        # if key in video:
-        #     video[key].extend(snippet)
-        # else:
-        #     video[key] = [snippet]
         videos.append((snippet, label, video_path))
 
 # Main body
@@ -182,24 +159,21 @@ if __name__ == "__main__":
     
     parser.add_argument('--workers', default=10, type=int,
                         help='Number of data loader workers.')
-    parser.add_argument('--model_path', default="S3D_final_DFDC_plan1", type=str, metavar='PATH',
+    parser.add_argument('--model_path', default="S3D_final_DFDC_plan11_2", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default='DFDC', 
+    parser.add_argument('--dataset', type=str, default='Face2Face', 
                         help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|DFDC)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str, default="plan3",
+    parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--efficient_net', type=int, default=0, 
-                        help="Which EfficientNet version to use (0 or 7, default: 0)")
-    parser.add_argument('--frames_per_video', type=int, default=30, 
-                        help="How many equidistant frames for each video (default: 30)")
-    parser.add_argument('--batch_size', type=int, default=32, 
-                        help="Batch size (default: 32)")
+    parser.add_argument('--model_type', type=int, default=0, 
+                        help="Which Net to use (0 or 1, default: 0)")
     
     opt = parser.parse_args()
     print(opt)
 
+    opt.config = "plan" + opt.model_path.split("plan")[1]
     if not opt.config:
         raise Exception("please input name of config file by '--config' .")
 
@@ -225,7 +199,10 @@ if __name__ == "__main__":
         exit()
 
     num_class = 1
-    model = S3D(num_class, config['model']['SRM-net'])
+    if opt.model_type == 0:
+        model = S3D(num_class, config['model']['SRM-net'])
+    elif opt.model_type == 1:
+        model = msca_S3D(num_class, config['model']['SRM-net'])
     model.load_state_dict(new_state_dict)
     model.eval()
     model = model.to(dev)
@@ -248,7 +225,7 @@ if __name__ == "__main__":
 
     for folder in folders:
         method_folder = os.path.join(TEST_DIR, folder)  
-        for index, video_folder in enumerate(os.listdir(method_folder)):
+        for _, video_folder in enumerate(os.listdir(method_folder)):
             paths.append(os.path.join(method_folder, video_folder))
 
     #for path in paths:
@@ -268,12 +245,12 @@ if __name__ == "__main__":
 
     bar = Bar('Predicting', max=len(videos))
 
-    f = open(opt.dataset + "_" + model_name + "_labels.txt", "w+")
+    #f = open(opt.dataset + "_" + model_name + "_labels.txt", "w+")
     for index, video in enumerate(videos):
         video_faces_preds = []
         video_name = video_names[index]
-        f.write(video_name)
-        #for key in video:
+        #f.write(video_name)
+        
         faces_preds = []
         video_faces = snippet_transform(video, os.path.basename(video_name), config)
         video_faces = video_faces.to(dev).float()
@@ -287,7 +264,7 @@ if __name__ == "__main__":
             
         current_faces_pred = sum(faces_preds)/len(faces_preds)
         face_pred = current_faces_pred.cpu().detach().numpy()[0]
-        f.write(" " + str(face_pred))
+        #f.write(" " + str(face_pred))
         video_faces_preds.append(face_pred)
         
         bar.next()
@@ -295,25 +272,24 @@ if __name__ == "__main__":
             video_pred = custom_video_round(video_faces_preds)
         else:
             video_pred = video_faces_preds[0]
-        preds.append([video_pred])
+        preds.append(video_pred)
         
-        f.write(" --> " + str(video_pred) + "(CORRECT: " + str(correct_test_labels[index]) + ")" +"\n")
+        #f.write(" --> " + str(video_pred) + "(CORRECT: " + str(correct_test_labels[index]) + ")" +"\n")
         
-    f.close()
+    #f.close()
     bar.finish()
 
     loss_fn = torch.nn.BCEWithLogitsLoss()
     tensor_labels = torch.tensor([[float(label)] for label in correct_test_labels])
-    tensor_preds = torch.tensor(preds)
+    tensor_preds = torch.tensor([[float(label)] for label in preds])
 
 
     loss = loss_fn(tensor_preds, tensor_labels).numpy()
 
-    #accuracy = accuracy_score(np.asarray(preds).round(), correct_test_labels)
-    accuracy = accuracy_score(custom_round(np.asarray(preds)), correct_test_labels)
-
+    accuracy = accuracy_score(correct_test_labels, custom_round(np.asarray(preds)))
     f1 = f1_score(correct_test_labels, custom_round(np.asarray(preds)))
     print(model_name, "Test Accuracy:", accuracy, "Loss:", loss, "F1", f1)
+
     save_roc_curves(correct_test_labels, preds, model_name, accuracy, loss, f1)
 
     for video_name in video_names:
