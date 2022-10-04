@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
 from model import S3D
+from msca_S3D import msca_S3D
 from utils import (check_correct, get_method, get_n_params, resize,
                    shuffle_dataset)
 
@@ -288,7 +289,12 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
 
     # 获得模型。
     num_class = 1
-    model = S3D(num_class, config['model']['SRM-net'])
+    if opt.model_type == 0:
+        model = S3D(num_class, config['model']['SRM-net'])
+        model_name = "S3D"
+    elif opt.model_type == 1:
+        model = msca_S3D(num_class, config['model']['SRM-net'])
+        model_name = "msca_S3D"
     model.to(dev)
     
     # 如果之前训练在某个点中断，可以从最近的检查点恢复。
@@ -458,7 +464,7 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
             if t % 10 == 0:
                 torch.save(model.state_dict(), 
                     os.path.join(MODELS_PATH,  
-                    "S3D_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
+                    model_name + "_checkpoint" + str(t) + "_" + opt.dataset + "_" + opt.config))
         #exit()
     
     # 删除临时缓存文件
@@ -475,7 +481,7 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
 
         # 保存最终模型。
         torch.save(model.state_dict(), 
-            os.path.join(MODELS_PATH, "final_models",  "S3D_final_" + opt.dataset + "_" + opt.config))
+            os.path.join(MODELS_PATH, "final_models",  model_name + "_final_" + opt.dataset + "_" + opt.config))
 
     # 结束分布式环境。
     dist.destroy_process_group()
@@ -500,6 +506,8 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=7, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--lrf', type=float, default=0.1)
+    parser.add_argument('--model_type', type=int, default=1, 
+                        help="Which Net to use (0 or 1, default: 0)")
     # 以下是多GPU的参数
     # 不要改该参数，系统会自动分配
     parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
