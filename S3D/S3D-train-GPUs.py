@@ -216,9 +216,6 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
     batch_size = config['training']['bs']
     lr = config['training']['lr'] * opt.world_size  # 学习率要根据并行GPU的数量进行倍增
 
-    if rank == 0:
-        tb_writer = SummaryWriter(log_dir="runs/" + opt.config)
-
     # 得到一些数据集的数据，并将数据集打乱。
     train_samples = len(train_dataset)
     train_dataset = shuffle_dataset(train_dataset)
@@ -313,6 +310,8 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
         # 这里注意，一定要指定map_location参数，否则会导致第一块GPU占用更多资源
         model.load_state_dict(torch.load(checkpoint_path, map_location=dev))
 
+    if rank == 0:
+        tb_writer = SummaryWriter(log_dir="runs/" + model_name + "/" + opt.config)
     # 在tensorboard中保存网络模型。
     if rank == 0:
         init_img = torch.zeros((1, 3, 20, 224, 224), device=dev)
