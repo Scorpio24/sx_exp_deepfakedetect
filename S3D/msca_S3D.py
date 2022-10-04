@@ -47,7 +47,7 @@ class msca_S3D(nn.Module):
             BasicConv3d(256, 256, kernel_size=1, stride=1),#out:bs*256*5*14*14
             #SepConv3d(256, 384, kernel_size=3, stride=1, padding=1),#out:bs*256*5*14*14
             nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),#out:bs*256*2*7*7
-            Mixed_5b(),
+            Mixed_5b(),#out:bs*512*2*7*7
             #Mixed_5c()
             
         )

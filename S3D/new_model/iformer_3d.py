@@ -3,6 +3,7 @@ import torch.nn as nn
 from new_model.msca_3d import SpatialAttention
 from new_model.Conv3d import BasicConv3d
 from new_model.Conv3d import SepConv3d
+from new_model.Conv3d import DWSepConv3d
 
 
 def make_divisible(v, divisor=8, min_value=None, round_limit=.9):
@@ -61,7 +62,8 @@ class InceptionMixer(nn.Module):
 
         self.fc_dw = nn.Sequential(
             BasicConv3d(self.high // 2, self.high // 2, 1),
-            nn.Conv3d(self.high // 2, self.high // 2, 3, padding=1, groups=self.high // 2),
+            DWSepConv3d(self.high // 2, (3,3,3), padding=(1,1,1)),
+            #nn.Conv3d(self.high // 2, self.high // 2, 3, padding=1, groups=self.high // 2),
             nn.BatchNorm3d(self.high // 2, eps=1e-3, momentum=0.001, affine=True),
         )
         
