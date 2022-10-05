@@ -346,7 +346,7 @@ if __name__ == '__main__':
     from thop import profile, clever_format
     
     model = S3D(1, 'yes')
-    #summary(model, (3, 20, 224, 224), batch_size=32, device='cpu')
+    # summary(model, (3, 20, 224, 224), batch_size=1, device='cpu')
 
     input = torch.randn(11, 3, 20, 224, 224)
     flops, params = profile(model, inputs=(input,), verbose=False)

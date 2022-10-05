@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from new_model.msca_3d import SpatialAttention
+from new_model.msca_3d import Mlp
 from new_model.Conv3d import BasicConv3d
 from new_model.Conv3d import SepConv3d
 from new_model.Conv3d import DWSepConv3d
@@ -13,39 +14,6 @@ def make_divisible(v, divisor=8, min_value=None, round_limit=.9):
     if new_v < round_limit * v:
         new_v += divisor
     return new_v
-
-
-class DWConv(nn.Module):
-    def __init__(self, dim=768):
-        super(DWConv, self).__init__()
-        self.dwconv = nn.Conv3d(dim, dim, 3, 1, 1, bias=True, groups=dim)
-
-    def forward(self, x):
-        x = self.dwconv(x)
-        return x
-
-# SegNeXt
-class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Conv3d(in_features, hidden_features, 1)
-        self.dwconv = DWConv(hidden_features)
-        self.act = act_layer()
-        self.fc2 = nn.Conv3d(hidden_features, out_features, 1)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-
-        x = self.dwconv(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-
-        return x
 
 class InceptionMixer(nn.Module):
     def __init__(self, input_channels, tran_ratio, time_size):
