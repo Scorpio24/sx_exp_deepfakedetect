@@ -44,7 +44,7 @@ class AttentionModule(nn.Module):
        
         self.conv1_1 = DWSepConv3d(dim, (time_size, 7, 7), padding=(time_padding, 3, 3))
         
-        self.conv2_1 = DWSepConv3d(dim, (time_size, 11, 11), padding=(time_padding, 5, 5))
+        # self.conv2_1 = DWSepConv3d(dim, (time_size, 11, 11), padding=(time_padding, 5, 5))
 
         self.conv3 = nn.Conv3d(dim, dim, 1)
 
@@ -58,9 +58,9 @@ class AttentionModule(nn.Module):
         attn_1 = self.conv1_1(attn)
         # attn_1 = self.conv1_2(attn_1)
 
-        attn_2 = self.conv2_1(attn)
+        # attn_2 = self.conv2_1(attn)
         # attn_2 = self.conv2_2(attn_2)
-        attn = attn + attn_0 + attn_1 + attn_2
+        attn = attn + attn_0 + attn_1 #+ attn_2
 
         attn = self.conv3(attn)
 
@@ -116,6 +116,7 @@ class MSCAN(nn.Module):
     def forward(self, x):
 
         x = x + self.attn(self.norm1(x))
-        x = x + self.mlp(self.norm2(x))
+        # x = x + self.mlp(self.norm2(x))
+        x = self.mlp(self.norm2(x))
         
         return x
