@@ -72,7 +72,7 @@ def snippet_transform(videos, name, config):
 
     return video
 
-def save_roc_curves(correct_labels, preds, model_name, accuracy, loss, f1):
+def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, f1):
   plt.figure(1)
   plt.plot([0, 1], [0, 1], 'k--')
 
@@ -91,7 +91,7 @@ def save_roc_curves(correct_labels, preds, model_name, accuracy, loss, f1):
   output_dir = os.path.join(OUTPUT_DIR, model_name)
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
-  plt.savefig(os.path.join(output_dir, opt.dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
+  plt.savefig(os.path.join(output_dir, dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
   plt.clf()
 
 def read_frames(video_path, videos, opt, config):
@@ -152,42 +152,13 @@ def read_frames(video_path, videos, opt, config):
     if len(snippet) > 0:
         videos.append((snippet, label, video_path))
 
-# Main body
-if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser()
-    
-    parser.add_argument('--workers', default=10, type=int,
-                        help='Number of data loader workers.')
-    parser.add_argument('--model_path', default="S3D_final_DFDC_plan11_2", type=str, metavar='PATH',
-                        help='Path to model checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default='Face2Face', 
-                        help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|DFDC)")
-    parser.add_argument('--max_videos', type=int, default=-1, 
-                        help="Maximum number of videos to use for training (default: all).")
-    parser.add_argument('--config', type=str,
-                        help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--model_type', type=int, default=0, 
-                        help="Which Net to use (0 or 1, default: 0)")
-    
-    opt = parser.parse_args()
-    print(opt)
-
-    opt.config = "plan" + opt.model_path.split("plan")[1]
-    if not opt.config:
-        raise Exception("please input name of config file by '--config' .")
-
-    # 读取配置文件。
-    config_path = os.path.join("S3D/configs", opt.config+".yaml")
-    with open(config_path, 'r') as ymlfile:
-        config = yaml.safe_load(ymlfile)
-    print(config)
+def modeleval(opt, dataset, config):
 
     dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    opt.model_path = os.path.join("models/final_models", opt.model_path)
-    if os.path.exists(opt.model_path):
-        state_dict = torch.load(opt.model_path, map_location=dev)
+    model_path = os.path.join("models/final_models", opt.model_path)
+    if os.path.exists(model_path):
+        state_dict = torch.load(model_path, map_location=dev)
         # create new OrderedDict that does not contain `module.`
         from collections import OrderedDict
         new_state_dict = OrderedDict()
@@ -218,10 +189,10 @@ if __name__ == "__main__":
     paths = []
     videos = mgr.list()
 
-    if opt.dataset != "DFDC":
-        folders = ["Original", opt.dataset]
+    if dataset != "DFDC":
+        folders = ["Original", dataset]
     else:
-        folders = [opt.dataset]
+        folders = [dataset]
 
     for folder in folders:
         method_folder = os.path.join(TEST_DIR, folder)  
@@ -240,8 +211,6 @@ if __name__ == "__main__":
     correct_test_labels = np.asarray([row[1] for row in videos])
     videos = [row[0] for row in videos]
     preds = []
-
-    tempdir = tempfile.gettempdir()
 
     bar = Bar('Predicting', max=len(videos))
 
@@ -283,17 +252,53 @@ if __name__ == "__main__":
     tensor_labels = torch.tensor([[float(label)] for label in correct_test_labels])
     tensor_preds = torch.tensor([[float(label)] for label in preds])
 
-
     loss = loss_fn(tensor_preds, tensor_labels).numpy()
 
     accuracy = accuracy_score(correct_test_labels, custom_round(np.asarray(preds)))
     f1 = f1_score(correct_test_labels, custom_round(np.asarray(preds)))
-    print(model_name, "Test Accuracy:", accuracy, "Loss:", loss, "F1", f1)
+    print(model_name, " ", dataset, " Test Accuracy:", accuracy, "Loss:", loss, "F1", f1)
 
-    save_roc_curves(correct_test_labels, preds, model_name, accuracy, loss, f1)
+    save_roc_curves(dataset, correct_test_labels, preds, model_name, accuracy, loss, f1)
 
     for video_name in video_names:
         for i in range(21):
             tempfilename = os.path.join(tempdir, os.path.basename(video_name)+"_"+str(i)+".npy")
             if os.path.exists(tempfilename) is True:
                 os.remove(tempfilename)
+
+# Main body
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--workers', default=10, type=int,
+                        help='Number of data loader workers.')
+    parser.add_argument('--model_path', default="S3D_final_DFDC_plan11", type=str, metavar='PATH',
+                        help='Path to model checkpoint (default: none).')
+    parser.add_argument('--dataset', type=str, default='Face2Face', 
+                        help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC)")
+    parser.add_argument('--max_videos', type=int, default=-1, 
+                        help="Maximum number of videos to use for training (default: all).")
+    parser.add_argument('--config', type=str,
+                        help="Which configuration to use. See into 'config' folder.")
+    parser.add_argument('--model_type', type=int, default=0, 
+                        help="Which Net to use (0 or 1, default: 0)")
+    
+    opt = parser.parse_args()
+    print(opt)
+
+    opt.config = "plan" + opt.model_path.split("plan")[1]
+    if not opt.config:
+        raise Exception("please input name of config file by '--config' .")
+
+    # 读取配置文件。
+    config_path = os.path.join("S3D/configs", opt.config+".yaml")
+    with open(config_path, 'r') as ymlfile:
+        config = yaml.safe_load(ymlfile)
+    print(config)
+
+    tempdir = tempfile.gettempdir()
+
+    datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC']
+    for dataset in datasets:
+        modeleval(opt, dataset, config)
