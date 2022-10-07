@@ -177,12 +177,13 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
     # Select N frames from the collected ones
     snippet = []
     for key in frames_paths_dict.keys():
-        if len(frames_paths_dict[key]) < 20:
+        if len(frames_paths_dict[key]) < 200:
             continue
-        frames_paths_dict[key] = frames_paths_dict[key][:20]
-        for _, frame_image in enumerate(frames_paths_dict[key]):
-            image=cv2.imread(os.path.join(video_path, frame_image))
-            snippet.append(image)
+        frames_paths_dict[key] = frames_paths_dict[key][:200]
+        for index, frame_image in enumerate(frames_paths_dict[key]):
+            if index % 10 ==0:
+                image=cv2.imread(os.path.join(video_path, frame_image))
+                snippet.append(image)
     if len(snippet) != 0:
         if TRAINING_DIR in video_path:
             train_dataset.append((snippet, label, os.path.basename(video_path)))

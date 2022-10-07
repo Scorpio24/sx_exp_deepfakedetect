@@ -6,8 +6,10 @@ import torch.nn.functional as F
 from SRM.HPF import HPF
 
 from new_model.Conv3d import SepConv3d
+from new_model.Conv3d import SepConv3dV2
 from new_model.Conv3d import BasicConv3d
 from new_model.iformer_3d import iFormerBlock
+from new_model.iformer_3d import iFormerBlock_light
 from new_model.msca_3d import MSCAN_half
 from new_model.msca_3d import MSCAN
 
@@ -26,31 +28,34 @@ class msca_S3D(nn.Module):
             SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),#out:bs*64*10*112*112
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
             MSCAN_half(64, 1),#out:bs*64*10*56*56
-            MSCAN(64, 1, mlp_ratio=8),#out:bs*64*10*56*56
 
             BasicConv3d(64, 64, kernel_size=1, stride=1),#out:bs*64*10*56*56
-            SepConv3d(64, 128, kernel_size=3, stride=1, padding=1),#out:bs*128*10*56*56
+            SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),#out:bs*128*10*56*56
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*128*10*28*28
-            MSCAN_half(128, 1),#out:bs*128*10*28*28
-            MSCAN(128, 1, mlp_ratio=8),#out:bs*128*10*28*28
+            iFormerBlock_light(192, 1/3, 1),#out:bs*128*10*28*28
+            iFormerBlock(192, 1/3, 1),#out:bs*128*10*28*28
 
-            # BasicConv3d(128, 320, kernel_size=1, stride=1),#out:bs*320*10*28*28
-            SepConv3d(128, 160, kernel_size=3, stride=1, padding=1),#out:bs*160*10*28*28
+            BasicConv3d(192, 320, kernel_size=1, stride=1),#out:bs*320*10*28*28
+            # SepConv3d(128, 160, kernel_size=3, stride=1, padding=1),#out:bs*160*10*28*28
             nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*160*5*14*14
-            MSCAN_half(160, 3),#out:bs*160*5*14*14
-            MSCAN_half(160, 3),#out:bs*160*5*14*14
-            MSCAN_half(160, 3),#out:bs*160*5*14*14
-            MSCAN_half(160, 3),#out:bs*160*5*14*14
-            MSCAN(160, 3),#out:bs*160*5*14*14
+            iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
+            iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
+            iFormerBlock(320, 1/2, 3),#out:bs*128*10*28*28
+            iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
+            iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
+            iFormerBlock(320, 2/3, 3),#out:bs*128*10*28*28
+            iFormerBlock_light(320, 4/5, 3),#out:bs*128*10*28*28
+            iFormerBlock_light(320, 4/5, 3),#out:bs*128*10*28*28
+            iFormerBlock(320, 4/5, 3),#out:bs*128*10*28*28
 
-            # BasicConv3d(320, 512, kernel_size=1, stride=1),#out:bs*512*5*14*14
-            SepConv3d(160, 256, kernel_size=3, stride=1, padding=1),#out:bs*256*5*14*14
+            # BasicConv3d(320, 384, kernel_size=1, stride=1),#out:bs*512*5*14*14
+            # SepConv3d(160, 256, kernel_size=3, stride=1, padding=1),#out:bs*256*5*14*14
             nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),#out:bs*256*2*7*7
-            Mixed_5b(256),#out:bs*512*2*7*7
-            #Mixed_5c()
+            Mixed_5b(320),#out:bs*512*2*7*7
+            Mixed_5c(512)
             
         )
-        self.fc = nn.Sequential(nn.Conv3d(512, num_class, kernel_size=1, stride=1, bias=True),)
+        self.fc = nn.Sequential(nn.Conv3d(1024, num_class, kernel_size=1, stride=1, bias=True),)
 
     def forward(self, x):
         if self.SRM_net == 'yes':
@@ -70,15 +75,43 @@ class Mixed_5b(nn.Module):
         super(Mixed_5b, self).__init__()
 
         self.branch0 = nn.Sequential(
-            BasicConv3d(input_channels, 128, kernel_size=1, stride=1),
+            BasicConv3d(input_channels, 192, kernel_size=1, stride=1),
         )
         self.branch1 = nn.Sequential(
-            BasicConv3d(input_channels, 64, kernel_size=1, stride=1),
-            SepConv3d(64, 128, kernel_size=3, stride=1, padding=1),
+            BasicConv3d(input_channels, 96, kernel_size=1, stride=1),
+            SepConv3dV2(96, 208, kernel_size=3, stride=1, padding=1),
         )
         self.branch2 = nn.Sequential(
-            BasicConv3d(input_channels, 32, kernel_size=1, stride=1),
-            SepConv3d(32, 128, kernel_size=3, stride=1, padding=1),
+            BasicConv3d(input_channels, 16, kernel_size=1, stride=1),
+            SepConv3dV2(16, 48, kernel_size=3, stride=1, padding=1),
+        )
+        self.branch3 = nn.Sequential(
+            nn.MaxPool3d(kernel_size=(3,3,3), stride=1, padding=1),
+            BasicConv3d(input_channels, 64, kernel_size=1, stride=1),
+        )
+
+    def forward(self, x):
+        x0 = self.branch0(x)
+        x1 = self.branch1(x)
+        x2 = self.branch2(x)
+        x3 = self.branch3(x)
+        out = torch.cat((x0, x1, x2, x3), 1)
+        return out
+
+class Mixed_5c(nn.Module):
+    def __init__(self, input_channels):
+        super(Mixed_5c, self).__init__()
+
+        self.branch0 = nn.Sequential(
+            BasicConv3d(input_channels, 384, kernel_size=1, stride=1),
+        )
+        self.branch1 = nn.Sequential(
+            BasicConv3d(input_channels, 192, kernel_size=1, stride=1),
+            SepConv3d(192, 384, kernel_size=3, stride=1, padding=1),
+        )
+        self.branch2 = nn.Sequential(
+            BasicConv3d(input_channels, 48, kernel_size=1, stride=1),
+            SepConv3d(48, 128, kernel_size=3, stride=1, padding=1),
         )
         self.branch3 = nn.Sequential(
             nn.MaxPool3d(kernel_size=(3,3,3), stride=1, padding=1),
