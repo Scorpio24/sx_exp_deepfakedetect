@@ -7,6 +7,7 @@ models
 *.docx
 *.png
 .vscode
+old_runs
 runs
 temp
 other-module

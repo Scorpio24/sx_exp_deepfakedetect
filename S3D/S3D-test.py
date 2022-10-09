@@ -143,12 +143,13 @@ def read_frames(video_path, videos, opt, config):
     snippet = []
     transform = create_base_transform(config['model']['image-size'])
     for key in frames_paths_dict.keys():
-        if len(frames_paths_dict[key]) < 20:
+        if len(frames_paths_dict[key]) < 200:
             continue
-        frames_paths_dict[key] = frames_paths_dict[key][:20]
-        for _, frame_image in enumerate(frames_paths_dict[key]):
-            image = transform(image=cv2.imread(os.path.join(video_path, frame_image)))['image']
-            snippet.append(image)
+        frames_paths_dict[key] = frames_paths_dict[key][:200]
+        for index, frame_image in enumerate(frames_paths_dict[key]):
+            if index % 10 == 0:
+                image = transform(image=cv2.imread(os.path.join(video_path, frame_image)))['image']
+                snippet.append(image)
     if len(snippet) > 0:
         videos.append((snippet, label, video_path))
 

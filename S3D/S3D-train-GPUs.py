@@ -181,7 +181,7 @@ def read_frames(video_path, train_dataset, validation_dataset, config):
             continue
         frames_paths_dict[key] = frames_paths_dict[key][:200]
         for index, frame_image in enumerate(frames_paths_dict[key]):
-            if index % 10 ==0:
+            if index % 10 == 0:
                 image=cv2.imread(os.path.join(video_path, frame_image))
                 snippet.append(image)
     if len(snippet) != 0:

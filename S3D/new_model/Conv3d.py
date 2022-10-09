@@ -5,11 +5,11 @@ class SepConv3d(nn.Module):
         super(SepConv3d, self).__init__()
         self.conv_s = nn.Conv3d(in_planes, out_planes, kernel_size=(1,kernel_size,kernel_size), stride=(1,stride,stride), padding=(0,padding,padding), bias=False)
         self.bn_s = nn.BatchNorm3d(out_planes, eps=1e-3, momentum=0.001, affine=True)
-        self.relu_s = nn.ReLU(inplace=True)
+        self.relu_s = nn.ReLU6(inplace=True)
 
         self.conv_t = nn.Conv3d(out_planes, out_planes, kernel_size=(kernel_size,1,1), stride=(stride,1,1), padding=(padding,0,0), bias=False)
         self.bn_t = nn.BatchNorm3d(out_planes, eps=1e-3, momentum=0.001, affine=True)
-        self.relu_t = nn.ReLU(inplace=True)
+        self.relu_t = nn.ReLU6(inplace=True)
 
     def forward(self, x):
         x = self.conv_s(x)
@@ -30,7 +30,7 @@ class SepConv3dV2(nn.Module):
 
         self.conv_t = nn.Conv3d(out_planes, out_planes, kernel_size=(kernel_size,1,1), stride=(stride,1,1), padding=(padding,0,0), bias=False)
         self.bn_t = nn.BatchNorm3d(out_planes, eps=1e-3, momentum=0.001, affine=True)
-        self.relu_t = nn.ReLU(inplace=True)
+        self.relu_t = nn.ReLU6(inplace=True)
 
     def forward(self, x):
         x = self.conv_s(x)
@@ -51,7 +51,7 @@ class DWSepConv3d(nn.Module):
 
         self.conv_t = nn.Conv3d(dim, dim, kernel_size=(kernel_size[0],1,1), stride=(stride,1,1), padding=(padding[0],0,0), groups=dim, bias=False)
         self.bn_t = nn.BatchNorm3d(dim, eps=1e-3, momentum=0.001, affine=True)
-        self.relu_t = nn.ReLU(inplace=True)
+        self.relu_t = nn.ReLU6(inplace=True)
 
     def forward(self, x):
         x = self.conv_s(x)
@@ -68,7 +68,7 @@ class BasicConv3d(nn.Module):
         super(BasicConv3d, self).__init__()
         self.conv = nn.Conv3d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, bias=False)
         self.bn = nn.BatchNorm3d(out_planes, eps=1e-3, momentum=0.001, affine=True)
-        self.relu = nn.ReLU(True)
+        self.relu = nn.ReLU6(True)
 
     def forward(self, x):
         x = self.conv(x)
