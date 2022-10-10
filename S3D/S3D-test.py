@@ -50,17 +50,17 @@ def create_base_transform(size):
 def snippet_transform(videos, name, config):
     video = list(map(np.asarray, videos))
 
-    if config['training']['mask-method'] != 'none':
-        random_list = [i for i in range(0, 8)]
-        random.shuffle(random_list)
-        for i in range(0, len(videos)):
-            videos[i] = get_masked_face_simple(
-                            videos[i],
-                            tempdir,
-                            name + "_" + str(i),
-                            random_list=random_list, 
-                            mask_method=config['training']['mask-method'], 
-                            mask_number=config['training']['mask-number'])
+    # if config['training']['mask-method'] != 'none':
+    #     random_list = [i for i in range(0, 8)]
+    #     random.shuffle(random_list)
+    #     for i in range(0, len(videos)):
+    #         videos[i] = get_masked_face_simple(
+    #                         videos[i],
+    #                         tempdir,
+    #                         name + "_" + str(i),
+    #                         random_list=random_list, 
+    #                         mask_method=config['training']['mask-method'], 
+    #                         mask_number=config['training']['mask-number'])
 
             
     #unique = uuid.uuid4()
