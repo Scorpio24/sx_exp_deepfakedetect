@@ -218,3 +218,11 @@ normalized_hpf_5x5_list = normalized_filter_class_3 + normalized_filter_edge_5x5
 
 normalized_3x3_list = normalized_filter_edge_3x3 + [normalized_square_3x3]
 normalized_5x5_list = normalized_filter_edge_5x5 + [normalized_square_5x5]
+
+msca_srm = [square_3x3 / 4, square_5x5 / 12, 
+  1/2*np.array([
+    [0, 0, 0],
+    [1, -2, 1],
+    [0, 0, 0]
+  ], dtype=np.float32)
+  ]

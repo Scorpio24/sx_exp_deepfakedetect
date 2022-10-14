@@ -5,6 +5,8 @@ models
 *.txt
 **/__pycache__
 *.docx
+*.xlsx
+*.csv
 *.png
 .vscode
 old_runs
@@ -12,3 +14,4 @@ runs
 temp
 other-module
 clearPicture.py
+*.ipynb

@@ -4,6 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from SRM.HPF import HPF
+from SRM.HPF import HPF_3
 
 from new_model.Conv3d import SepConv3d
 from new_model.Conv3d import SepConv3dV2
@@ -19,11 +20,11 @@ class msca_S3D(nn.Module):
 
         self.SRM_net = SRM_net
         if SRM_net == 'yes':
-            input_channels = 30
+            input_channels = 3
         else:
             input_channels = 3
 
-        self.SRM = HPF()
+        self.SRM = HPF_3()
         self.base = nn.Sequential( # input:bs*(3/30) *20*224*224
             SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),#out:bs*64*10*112*112
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
@@ -59,7 +60,7 @@ class msca_S3D(nn.Module):
 
     def forward(self, x):
         if self.SRM_net == 'yes':
-            y = self.SRM(x)
+            y = x + self.SRM(x)
         else:
             y = x
         y = self.base(y)
