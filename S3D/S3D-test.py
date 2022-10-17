@@ -101,6 +101,8 @@ def read_frames(video_path, videos, opt, config):
     if "Original" in video_path:
         label = 0.
     #elif method == "DFDC":
+    elif "real" in video_path:
+        label = 0.
     elif "DFDC" in video_path:
         for json_path in glob.glob(os.path.join(METADATA_PATH, "*.json")):
             with open(json_path, "r") as f:
@@ -122,6 +124,8 @@ def read_frames(video_path, videos, opt, config):
         # video_folder_name = os.path.basename(video_path)
         # video_key = video_folder_name + ".mp4"
         # label = test_df.loc[test_df['filename'] == video_key]['label'].values[0]
+    elif "synthesis" in video_path:
+        label = 1.
     else:
         label = 1.
     
@@ -190,7 +194,9 @@ def modeleval(opt, dataset, config):
     paths = []
     videos = mgr.list()
 
-    if dataset != "DFDC":
+    if dataset == "Celeb_DF":
+        folders = ["Celeb-real", "Celeb-synthesis"]
+    elif dataset != "DFDC":
         folders = ["Original", dataset]
     else:
         folders = [dataset]
@@ -276,8 +282,8 @@ if __name__ == "__main__":
                         help='Number of data loader workers.')
     parser.add_argument('--model_path', default="S3D_final_DFDC_plan11", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default='Face2Face', 
-                        help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC)")
+    parser.add_argument('--dataset', type=str, 
+                        help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC|Celeb_DF)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
@@ -300,6 +306,9 @@ if __name__ == "__main__":
 
     tempdir = tempfile.gettempdir()
 
-    datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC']
+    if not opt.dataset:
+        datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC']
+    else:
+        datasets = [opt.dataset]
     for dataset in datasets:
         modeleval(opt, dataset, config)
