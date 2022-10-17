@@ -307,7 +307,7 @@ if __name__ == "__main__":
     tempdir = tempfile.gettempdir()
 
     if not opt.dataset:
-        datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC']
+        datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC', 'Celeb_DF']
     else:
         datasets = [opt.dataset]
     for dataset in datasets:
