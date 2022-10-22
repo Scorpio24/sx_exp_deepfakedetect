@@ -22,6 +22,7 @@ from get_masked_face_simple import get_masked_face_simple
 
 from model import S3D
 from msca_S3D import msca_S3D
+from msca_S3D import msca_S3D_SRM
 from transforms.albu import IsotropicResize
 from utils import (custom_round, custom_video_round, get_method)
 
@@ -179,6 +180,8 @@ def modeleval(opt, dataset, config):
         model = S3D(num_class, config['model']['SRM-net'])
     elif opt.model_type == 1:
         model = msca_S3D(num_class, config['model']['SRM-net'])
+    elif opt.model_type == 2:
+        model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
     model.load_state_dict(new_state_dict)
     model.eval()
     model = model.to(dev)
@@ -282,7 +285,7 @@ if __name__ == "__main__":
                         help='Number of data loader workers.')
     parser.add_argument('--model_path', default="S3D_final_DFDC_plan11", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, 
+    parser.add_argument('--dataset', type=str, default="Celeb_DF",
                         help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC|Celeb_DF)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
