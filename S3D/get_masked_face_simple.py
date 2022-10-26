@@ -105,7 +105,7 @@ def get_masked_face_simple(input_img, tempdir, img_id, random_list, mask_method,
 if __name__ == '__main__':
     import yaml
     # 读取配置文件。
-    with open("S3D/configs/plan3.yaml", 'r') as ymlfile:
+    with open("S3D/configs/plan9_3.yaml", 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
     #读取图片。
@@ -117,3 +117,4 @@ if __name__ == '__main__':
     #masked = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
     cv2.imshow('masked', masked)
     cv2.waitKey(0)
+    cv2.imwrite("./1_0_black.png", masked)

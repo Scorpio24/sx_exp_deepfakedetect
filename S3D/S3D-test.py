@@ -34,7 +34,18 @@ OUTPUT_DIR = os.path.join(MODELS_DIR, "tests")
 METADATA_PATH = os.path.join(BASE_DIR, "metadata") # Folder containing all training metadata for DFDC dataset
 TEST_LABELS_PATH = os.path.join(BASE_DIR, "dataset/dfdc_test_labels.csv")
 
-
+modelname = {
+    "S3D_final_DFDC_plan1":"S3D",
+    "S3D_final_DFDC_plan5":"S3D+SRM",
+    "S3D_final_DFDC_plan9":"S3D+mask6",
+    "S3D_final_DFDC_plan9_2":"S3D+mask8",
+    "S3D_final_DFDC_plan9_3":"S3D+mask4",
+    "S3D_final_DFDC_plan11":"S3D+SRM+mask6",
+    "msca_S3D_final_DFDC_mplan1":"msca_S3D",
+    "msca_S3D_final_DFDC_mplan5":"msca_S3D+SRM",
+    "msca_S3D_final_DFDC_mplan9":"msca_S3D+mask6",
+    "msca_S3D_final_DFDC_mplan9_3":"msca_S3D+mask4",
+}
 
 if not os.path.exists(MODELS_DIR):
     os.makedirs(MODELS_DIR)
@@ -82,7 +93,7 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
   model_auc = auc(fpr, tpr)
 
 
-  plt.plot(fpr, tpr, label="Model_"+ model_name + ' (area = {:.3f})'.format(model_auc))
+  plt.plot(fpr, tpr, label=modelname[model_name] + ' (area = {:.3f})'.format(model_auc))
 
   plt.xlabel('False positive rate')
   plt.ylabel('True positive rate')
@@ -159,8 +170,8 @@ def read_frames(video_path, videos, opt, config):
         videos.append((snippet, label, video_path))
 
 def modeleval(opt, dataset, config):
-
-    dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    dev = torch.device("cpu")
+    # dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     model_path = os.path.join("models/final_models", opt.model_path)
     if os.path.exists(model_path):
@@ -285,7 +296,7 @@ if __name__ == "__main__":
                         help='Number of data loader workers.')
     parser.add_argument('--model_path', default="S3D_final_DFDC_plan11", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
-    parser.add_argument('--dataset', type=str, default="Celeb_DF",
+    parser.add_argument('--dataset', type=str, default="DFDC",
                         help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC|Celeb_DF)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
