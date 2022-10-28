@@ -92,26 +92,35 @@ def snippet_transform(videos, name, config):
     return video
 
 def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, f1):
-  plt.figure(1)
-  plt.plot([0, 1], [0, 1], 'k--')
+    plt.figure(1)
+    plt.plot([0, 1], [0, 1], 'k--')
 
-  fpr, tpr, th = metrics.roc_curve(correct_labels, preds)
+    fpr, tpr, th = metrics.roc_curve(correct_labels, preds)
 
-  model_auc = auc(fpr, tpr)
+    resultpath = "./result/roc"
+    if not os.path.exists(resultpath):
+        os.makedirs(resultpath)
+    filename = dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".txt"
+    filepath = os.path.join(resultpath, filename)
+    with open(filepath, 'w') as f:
+        f.write("fpr: "+str(fpr)+"\n")
+        f.write("tpr: "+str(tpr)+"\n")
+
+    model_auc = auc(fpr, tpr)
 
 
-  plt.plot(fpr, tpr, label=modelname[model_name] + ' (area = {:.3f})'.format(model_auc))
+    plt.plot(fpr, tpr, label=modelname[model_name] + ' (area = {:.3f})'.format(model_auc))
 
-  plt.xlabel('False positive rate')
-  plt.ylabel('True positive rate')
-  plt.title('ROC curve')
-  plt.legend(loc='best')
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')
+    plt.legend(loc='best')
 
-  output_dir = os.path.join(OUTPUT_DIR, model_name)
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-  plt.savefig(os.path.join(output_dir, dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
-  plt.clf()
+    output_dir = os.path.join(OUTPUT_DIR, model_name)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    plt.savefig(os.path.join(output_dir, dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
+    plt.clf()
 
 def read_frames(video_path, videos, opt, config):
     
@@ -303,7 +312,7 @@ if __name__ == "__main__":
     
     parser.add_argument('--workers', default=10, type=int,
                         help='Number of data loader workers.')
-    parser.add_argument('--model_path', default="S3D_final_DFDC_plan11", type=str, metavar='PATH',
+    parser.add_argument('--model_path', default="S3D_final_DFDC_plan1", type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
     parser.add_argument('--dataset', type=str, default="DFDC",
                         help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC|Celeb_DF)")
@@ -311,7 +320,7 @@ if __name__ == "__main__":
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--model_type', type=int, default=3, 
+    parser.add_argument('--model_type', type=int, default=0, 
                         help="Which Net to use (0=S3D,1=msca_S3D,2=msca_S3D_SRM,3=CA_S3D)")
     
     opt = parser.parse_args()
