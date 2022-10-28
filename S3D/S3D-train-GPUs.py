@@ -511,7 +511,7 @@ if __name__ == '__main__':
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--patience', type=int, default=7, 
+    parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--lrf', type=float, default=0.1)
     parser.add_argument('--model_type', type=int, default=3, 
