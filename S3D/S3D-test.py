@@ -46,6 +46,12 @@ modelname = {
     "msca_S3D_final_DFDC_mplan5":"msca_S3D+SRM",
     "msca_S3D_final_DFDC_mplan9":"msca_S3D+mask6",
     "msca_S3D_final_DFDC_mplan9_3":"msca_S3D+mask4",
+    "CA_S3D_final_DFDC_caplan1":"CA_S3D",
+    "CA_S3D_final_DFDC_caplan5":"CA_S3D+SRM",
+    "CA_S3D_final_DFDC_caplan9":"CA_S3D+mask6",
+    "CA_S3D_final_DFDC_caplan9_2":"CA_S3D+mask8",
+    "CA_S3D_final_DFDC_caplan9_3":"CA_S3D+mask4",
+    "CA_S3D_final_DFDC_caplan11":"CA_S3D+SRM+mask6",
 }
 
 if not os.path.exists(MODELS_DIR):
@@ -196,7 +202,6 @@ def modeleval(opt, dataset, config):
         model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
     elif opt.model_type == 3:
         model = CA_S3D(num_class, config['model']['SRM-net'])
-        model_name = "CA_S3D"
     model.load_state_dict(new_state_dict)
     model.eval()
     model = model.to(dev)
@@ -306,8 +311,8 @@ if __name__ == "__main__":
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--model_type', type=int, default=0, 
-                        help="Which Net to use (0,1,2, default: 0)")
+    parser.add_argument('--model_type', type=int, default=3, 
+                        help="Which Net to use (0=S3D,1=msca_S3D,2=msca_S3D_SRM,3=CA_S3D)")
     
     opt = parser.parse_args()
     print(opt)
