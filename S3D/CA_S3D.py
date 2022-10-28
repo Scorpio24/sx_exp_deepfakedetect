@@ -2,10 +2,12 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from SRM.HPF import HPF
+from new_model.msca_3d import MSCAN_half
+from new_model.msca_3d import MSCAN
 
-class S3D(nn.Module):
+class CA_S3D(nn.Module):
     def __init__(self, num_class, SRM_net):
-        super(S3D, self).__init__()
+        super(CA_S3D, self).__init__()
 
         self.SRM_net = SRM_net
         if SRM_net == 'yes':
@@ -14,23 +16,24 @@ class S3D(nn.Module):
             input_channels = 3
 
         self.SRM = HPF()
-        self.base = nn.Sequential(
-            SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),
-            nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),
-            BasicConv3d(64, 64, kernel_size=1, stride=1),
-            SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),
-            nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),
-            Mixed_3b(),
-            Mixed_3c(),
-            nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),
-            Mixed_4b(),
-            Mixed_4c(),
-            Mixed_4d(),
-            Mixed_4e(),
-            Mixed_4f(),
-            nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),
-            Mixed_5b(),
-            Mixed_5c(),
+        self.base = nn.Sequential(# input:bs*(3/30) *20*224*224
+            SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),#out:bs*64*10*112*112
+            nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
+            MSCAN_half(64, 1),#out:bs*64*10*56*56
+            BasicConv3d(64, 64, kernel_size=1, stride=1),#out:bs*64*10*56*56
+            SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),#out:bs*192*10*56*56
+            nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*192*10*28*28
+            Mixed_3b(),#out:bs*256*10*28*28
+            Mixed_3c(),#out:bs*480*10*28*28
+            nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*480*5*14*14
+            Mixed_4b(),#out:bs*512*5*14*14
+            Mixed_4c(),#out:bs*512*5*14*14
+            Mixed_4d(),#out:bs*512*5*14*14
+            Mixed_4e(),#out:bs*528*5*14*14
+            Mixed_4f(),#out:bs*832*5*14*14
+            nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),#out:bs*832*2*7*7
+            Mixed_5b(),#out:bs*832*2*7*7
+            Mixed_5c(),#out:bs*1024*2*7*7
         )
         self.fc = nn.Sequential(nn.Conv3d(1024, num_class, kernel_size=1, stride=1, bias=True),)
 
@@ -345,7 +348,7 @@ if __name__ == '__main__':
     from torchsummary import summary
     from thop import profile, clever_format
     
-    model = S3D(1, 'no')
+    model = CA_S3D(1, 'no')
     # summary(model, (3, 20, 224, 224), batch_size=1, device='cpu')
 
     input = torch.randn(11, 3, 20, 224, 224)

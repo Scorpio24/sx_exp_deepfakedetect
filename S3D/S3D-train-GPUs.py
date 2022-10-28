@@ -28,7 +28,9 @@ from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
 from model import S3D
+from CA_S3D import CA_S3D
 from msca_S3D import msca_S3D
+from msca_S3D import msca_S3D_SRM
 from utils import (check_correct, get_method, get_n_params, resize,
                    shuffle_dataset)
 
@@ -293,6 +295,12 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
     elif opt.model_type == 1:
         model = msca_S3D(num_class, config['model']['SRM-net'])
         model_name = "msca_S3D"
+    elif opt.model_type == 2:
+        model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
+        model_name = "msca_S3D_SRM"
+    elif opt.model_type == 3:
+        model = CA_S3D(num_class, config['model']['SRM-net'])
+        model_name = "CA_S3D"
     model.to(dev)
     
     # 如果之前训练在某个点中断，可以从最近的检查点恢复。
@@ -506,8 +514,8 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=7, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--lrf', type=float, default=0.1)
-    parser.add_argument('--model_type', type=int, default=1, 
-                        help="Which Net to use (0 or 1, default: 0)")
+    parser.add_argument('--model_type', type=int, default=3, 
+                        help="Which Net to use (0=S3D,1=msca_S3D,2=msca_S3D_SRM,3=CA_S3D)")
     # 以下是多GPU的参数
     # 不要改该参数，系统会自动分配
     parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')

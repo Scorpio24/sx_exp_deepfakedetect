@@ -21,6 +21,7 @@ from tqdm import tqdm
 from get_masked_face_simple import get_masked_face_simple
 
 from model import S3D
+from CA_S3D import CA_S3D
 from msca_S3D import msca_S3D
 from msca_S3D import msca_S3D_SRM
 from transforms.albu import IsotropicResize
@@ -193,6 +194,9 @@ def modeleval(opt, dataset, config):
         model = msca_S3D(num_class, config['model']['SRM-net'])
     elif opt.model_type == 2:
         model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
+    elif opt.model_type == 3:
+        model = CA_S3D(num_class, config['model']['SRM-net'])
+        model_name = "CA_S3D"
     model.load_state_dict(new_state_dict)
     model.eval()
     model = model.to(dev)
@@ -303,7 +307,7 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model_type', type=int, default=0, 
-                        help="Which Net to use (0 or 1, default: 0)")
+                        help="Which Net to use (0,1,2, default: 0)")
     
     opt = parser.parse_args()
     print(opt)
