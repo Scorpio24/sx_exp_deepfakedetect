@@ -97,7 +97,7 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
 
     fpr, tpr, th = metrics.roc_curve(correct_labels, preds)
 
-    resultpath = "./result/roc"
+    resultpath = os.path.join("./result/roc", model_name)
     if not os.path.exists(resultpath):
         os.makedirs(resultpath)
     filename = dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".txt"
