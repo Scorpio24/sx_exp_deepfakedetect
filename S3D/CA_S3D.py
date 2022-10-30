@@ -26,6 +26,7 @@ class CA_S3D(nn.Module):
             Mixed_3b(),#out:bs*256*10*28*28
             Mixed_3c(),#out:bs*480*10*28*28
             nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*480*5*14*14
+            MSCAN_half(480, 1),#out:bs*192*10*28*28
             Mixed_4b(),#out:bs*512*5*14*14
             Mixed_4c(),#out:bs*512*5*14*14
             Mixed_4d(),#out:bs*512*5*14*14
