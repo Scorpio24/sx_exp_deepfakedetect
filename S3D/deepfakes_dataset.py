@@ -81,8 +81,8 @@ class DeepFakesDataset(Dataset):
         #unique = uuid.uuid4()
         
         video = list(map(lambda f: transform(image=f)['image'], video))
-        #self.mode == 'train' and 
-        if self.mask_method != 'none':# 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
+        
+        if self.mode == 'train' and self.mask_method != 'none':# 目前的方法是对一个视频内的所有人脸图像采取同样的掩码区域。
             random_list = [i for i in range(0, 8)]
             random.shuffle(random_list)
             for i in range(0, len(video)):
