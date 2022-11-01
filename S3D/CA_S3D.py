@@ -5,9 +5,9 @@ from SRM.HPF import HPF
 from new_model.msca_3d import MSCAN_half
 from new_model.msca_3d import MSCAN
 
-class CA_S3D(nn.Module):
+class CA_S3D_v2(nn.Module):
     def __init__(self, num_class, SRM_net):
-        super(CA_S3D, self).__init__()
+        super(CA_S3D_v2, self).__init__()
 
         self.SRM_net = SRM_net
         if SRM_net == 'yes':
@@ -21,12 +21,13 @@ class CA_S3D(nn.Module):
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
             BasicConv3d(64, 64, kernel_size=1, stride=1),#out:bs*64*10*56*56
             SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),#out:bs*192*10*56*56
+            MSCAN_half(192,1),
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*192*10*28*28
-            MSCAN_half(192, 1),#out:bs*192*10*28*28
+            # MSCAN_half(192, 1),#out:bs*192*10*28*28
             Mixed_3b(),#out:bs*256*10*28*28
             Mixed_3c(),#out:bs*480*10*28*28
             nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*480*5*14*14
-            MSCAN_half(480, 1),#out:bs*192*10*28*28
+            # MSCAN_half(480, 1),#out:bs*192*10*28*28
             Mixed_4b(),#out:bs*512*5*14*14
             Mixed_4c(),#out:bs*512*5*14*14
             Mixed_4d(),#out:bs*512*5*14*14
@@ -349,7 +350,7 @@ if __name__ == '__main__':
     from torchsummary import summary
     from thop import profile, clever_format
     
-    model = CA_S3D(1, 'no')
+    model = CA_S3D_v2(1, 'no')
     # summary(model, (3, 20, 224, 224), batch_size=1, device='cpu')
 
     input = torch.randn(11, 3, 20, 224, 224)
