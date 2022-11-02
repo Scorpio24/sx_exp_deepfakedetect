@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
 from model import S3D
-from CA_S3D import CA_S3D
+from CA_S3D import CA_S3D_v3
 from msca_S3D import msca_S3D
 from msca_S3D import msca_S3D_SRM
 from utils import (check_correct, get_method, get_n_params, resize,
@@ -195,8 +195,8 @@ if __name__ == '__main__':
         model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
         model_name = "msca_S3D_SRM"
     elif opt.model_type == 3:
-        model = CA_S3D(num_class, config['model']['SRM-net'])
-        model_name = "CA_S3D"
+        model = CA_S3D_v3(num_class, config['model']['SRM-net'])
+        model_name = "CA_S3D_v3"
     model.train()
     model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])

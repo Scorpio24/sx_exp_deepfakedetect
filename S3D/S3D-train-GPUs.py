@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 from deepfakes_dataset import DeepFakesDataset
 from model import S3D
-from CA_S3D import CA_S3D_v2
+from CA_S3D import CA_S3D_v3
 from msca_S3D import msca_S3D
 from msca_S3D import msca_S3D_SRM
 from utils import (check_correct, get_method, get_n_params, resize,
@@ -299,8 +299,8 @@ def fit(rank, world_size, opt, config, train_dataset, validation_dataset):
         model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
         model_name = "msca_S3D_SRM"
     elif opt.model_type == 3:
-        model = CA_S3D_v2(num_class, config['model']['SRM-net'])
-        model_name = "CA_S3D"
+        model = CA_S3D_v3(num_class, config['model']['SRM-net'])
+        model_name = "CA_S3D_v3"
     model.to(dev)
     
     # 如果之前训练在某个点中断，可以从最近的检查点恢复。
