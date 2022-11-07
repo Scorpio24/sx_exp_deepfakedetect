@@ -97,15 +97,6 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
 
     fpr, tpr, th = metrics.roc_curve(correct_labels, preds)
 
-    resultpath = os.path.join("./result/roc", model_name)
-    if not os.path.exists(resultpath):
-        os.makedirs(resultpath)
-    filename = dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".txt"
-    filepath = os.path.join(resultpath, filename)
-    with open(filepath, 'w') as f:
-        f.write("fpr: "+str(fpr)+"\n")
-        f.write("tpr: "+str(tpr)+"\n")
-
     model_auc = auc(fpr, tpr)
 
 
@@ -121,6 +112,12 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
         os.makedirs(output_dir)
     plt.savefig(os.path.join(output_dir, dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
     plt.clf()
+
+    filename = dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".txt"
+    filepath = os.path.join(output_dir, filename)
+    with open(filepath, 'w') as f:
+        f.write("fpr: "+str(fpr)+"\n")
+        f.write("tpr: "+str(tpr)+"\n")
 
 def read_frames(video_path, videos, opt, config):
     
