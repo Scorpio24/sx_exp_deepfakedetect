@@ -514,7 +514,7 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--lrf', type=float, default=0.1)
-    parser.add_argument('--model_type', type=int, default=3, 
+    parser.add_argument('--model_type', type=int, default=1, 
                         help="Which Net to use (0=S3D,1=msca_S3D,2=msca_S3D_SRM,3=CA_S3D)")
     # 以下是多GPU的参数
     # 不要改该参数，系统会自动分配
@@ -537,7 +537,12 @@ if __name__ == '__main__':
     print(config)
 
     #READ DATASET
-    folders = ["DFDC"]
+    if opt.dataset != "All" and opt.dataset != "DFDC":
+        folders = ["Original", opt.dataset]
+    elif opt.dataset == "DFDC":
+        folder = ["DFDC"]
+    elif opt.dataset == "All":
+        folders = ["Original", "Deepfakes", "Face2Face", "FaceShifter", "FaceSwap", "NeuralTextures"]
     sets = [TRAINING_DIR, VALIDATION_DIR]
 
     # 遍历目录和数据集，得到视频的路径，精确到视频目录，具体格式类似为“data\dataset\training_set\DFDC\aagfhgtpmv”。

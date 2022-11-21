@@ -100,7 +100,7 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
     model_auc = auc(fpr, tpr)
 
 
-    plt.plot(fpr, tpr, label=modelname[model_name] + ' (area = {:.3f})'.format(model_auc))
+    plt.plot(fpr, tpr, label=model_name + ' (area = {:.3f})'.format(model_auc))
 
     plt.xlabel('False positive rate')
     plt.ylabel('True positive rate')
@@ -317,7 +317,7 @@ if __name__ == "__main__":
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
                         help="Which configuration to use. See into 'config' folder.")
-    parser.add_argument('--model_type', type=int, default=3, 
+    parser.add_argument('--model_type', type=int, default=1, 
                         help="Which Net to use (0=S3D,1=msca_S3D,2=msca_S3D_SRM,3=CA_S3D)")
     
     opt = parser.parse_args()

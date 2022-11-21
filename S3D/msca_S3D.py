@@ -85,7 +85,7 @@ class msca_S3D(nn.Module):
         self.base = nn.Sequential( # input:bs*(3/30) *20*224*224
             SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),#out:bs*64*10*112*112
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
-            MSCAN_half(64, 1),#out:bs*64*10*56*56
+            # MSCAN(64, 1),#out:bs*64*10*56*56
 
             BasicConv3d(64, 64, kernel_size=1, stride=1),#out:bs*64*10*56*56
             SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),#out:bs*128*10*56*56
