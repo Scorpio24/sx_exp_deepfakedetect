@@ -22,15 +22,16 @@ class InceptionMixer(nn.Module):
         conv_chans = input_channels - tran_chans
         self.high = conv_chans
         self.low  = tran_chans
+        time_padding = time_size // 2
 
         self.maxpool_fc = nn.Sequential(
-            nn.MaxPool3d(kernel_size=(time_size, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1)),
+            nn.MaxPool3d(kernel_size=(time_size, 3, 3), stride=(1, 1, 1), padding=(time_padding, 1, 1)),
             BasicConv3d(self.high // 2, self.high // 2, 1),
         )
 
         self.fc_dw = nn.Sequential(
             BasicConv3d(self.high // 2, self.high // 2, 1),
-            DWSepConv3d(self.high // 2, (time_size,3,3), padding=(1,1,1)),
+            DWSepConv3d(self.high // 2, (time_size,3,3), padding=(time_padding,1,1)),
             #nn.Conv3d(self.high // 2, self.high // 2, 3, padding=1, groups=self.high // 2),
             nn.BatchNorm3d(self.high // 2, eps=1e-3, momentum=0.001, affine=True),
         )

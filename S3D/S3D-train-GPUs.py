@@ -506,7 +506,7 @@ if __name__ == '__main__':
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
     parser.add_argument('--dataset', type=str, default='DFDC', 
-                        help="Which dataset to use (Deepfakes|Face2Face|FaceShifter|FaceSwap|NeuralTextures|All)")
+                        help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|All)")
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str,
