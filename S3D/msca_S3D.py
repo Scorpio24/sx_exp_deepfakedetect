@@ -96,13 +96,13 @@ class msca_S3D(nn.Module):
             BasicConv3d(192, 320, kernel_size=1, stride=1),#out:bs*320*10*28*28
             # SepConv3d(128, 160, kernel_size=3, stride=1, padding=1),#out:bs*160*10*28*28
             nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*160*5*14*14
-            iFormerBlock_light(320, 1/3, 3),#out:bs*128*10*28*28
+            # iFormerBlock_light(320, 1/3, 3),#out:bs*128*10*28*28
             iFormerBlock_light(320, 1/3, 3),#out:bs*128*10*28*28
             iFormerBlock(320, 1/3, 3),#out:bs*128*10*28*28
-            iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
+            # iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
             iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
             iFormerBlock(320, 1/2, 3),#out:bs*128*10*28*28
-            iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
+            # iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
             iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
             iFormerBlock(320, 2/3, 3),#out:bs*128*10*28*28
 

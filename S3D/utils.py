@@ -25,7 +25,7 @@ def resize(image, image_size):
 def custom_round(values):
     result = []
     for value in values:
-        if value > 0.55:
+        if value > 0.5:
             result.append(1)
         else:
             result.append(0)
@@ -33,7 +33,7 @@ def custom_round(values):
 
 def custom_video_round(preds):
     for pred_value in preds:
-        if pred_value > 0.55:
+        if pred_value > 0.5:
             return pred_value
     return mean(preds)
 
