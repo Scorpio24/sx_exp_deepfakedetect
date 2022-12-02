@@ -198,7 +198,7 @@ if __name__ == '__main__':
     from torchsummary import summary
     from thop import profile, clever_format
     
-    model = msca_S3D(1, 'yes')
+    model = msca_S3Dv2(1, 'yes')
     #summary(model, (3, 20, 224, 224), batch_size=11, device='cpu')
 
     # model = testmodel()
