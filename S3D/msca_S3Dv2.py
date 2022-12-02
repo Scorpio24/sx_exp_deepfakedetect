@@ -28,7 +28,7 @@ class msca_S3D_SRM(nn.Module):
         self.base = nn.Sequential( # input:bs*(3/30) *20*224*224
             SepConv3d(input_channels, 64, kernel_size=7, stride=2, padding=3),#out:bs*64*10*112*112
             nn.MaxPool3d(kernel_size=(1,3,3), stride=(1,2,2), padding=(0,1,1)),#out:bs*64*10*56*56
-            MSCAN_half(64, 1),#out:bs*64*10*56*56
+            # MSCAN_half(64, 1),#out:bs*64*10*56*56
 
             BasicConv3d(64, 64, kernel_size=1, stride=1),#out:bs*64*10*56*56
             SepConv3d(64, 192, kernel_size=3, stride=1, padding=1),#out:bs*192*10*56*56
@@ -39,15 +39,15 @@ class msca_S3D_SRM(nn.Module):
             BasicConv3d(192, 320, kernel_size=1, stride=1),#out:bs*320*10*28*28
             # SepConv3d(128, 160, kernel_size=3, stride=1, padding=1),#out:bs*160*10*28*28
             nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*320*5*14*14
-            iFormerBlock_light(320, 1/3, 3),#out:bs*320*10*28*28
-            iFormerBlock_light(320, 1/3, 3),#out:bs*320*10*28*28
-            iFormerBlock(320, 1/3, 3),#out:bs*320*10*28*28
-            iFormerBlock_light(320, 1/2, 3),#out:bs*320*10*28*28
-            iFormerBlock_light(320, 1/2, 3),#out:bs*320*10*28*28
-            iFormerBlock(320, 1/2, 3),#out:bs*320*10*28*28
-            iFormerBlock_light(320, 2/3, 3),#out:bs*320*10*28*28
-            iFormerBlock_light(320, 2/3, 3),#out:bs*320*10*28*28
-            iFormerBlock(320, 2/3, 3),#out:bs*320*10*28*28
+            iFormerBlock_light(320, 1/3, 3),#out:bs*320*5*14*14
+            iFormerBlock_light(320, 1/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/3, 3),#out:bs*320*5*14*14
+            iFormerBlock_light(320, 1/2, 3),#out:bs*320*5*14*14
+            iFormerBlock_light(320, 1/2, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/2, 3),#out:bs*320*5*14*14
+            iFormerBlock_light(320, 2/3, 3),#out:bs*320*5*14*14
+            iFormerBlock_light(320, 2/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 2/3, 3),#out:bs*320*5*14*14
 
             # BasicConv3d(320, 384, kernel_size=1, stride=1),#out:bs*512*5*14*14
             # SepConv3d(160, 256, kernel_size=3, stride=1, padding=1),#out:bs*256*5*14*14
@@ -71,9 +71,9 @@ class msca_S3D_SRM(nn.Module):
 
         return logits
 
-class msca_S3D(nn.Module):
+class msca_S3Dv2(nn.Module):
     def __init__(self, num_class, SRM_net):
-        super(msca_S3D, self).__init__()
+        super(msca_S3Dv2, self).__init__()
 
         self.SRM_net = SRM_net
         if SRM_net == 'yes':
@@ -95,20 +95,20 @@ class msca_S3D(nn.Module):
 
             BasicConv3d(192, 320, kernel_size=1, stride=1),#out:bs*320*10*28*28
             # SepConv3d(128, 160, kernel_size=3, stride=1, padding=1),#out:bs*160*10*28*28
-            nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*160*5*14*14
-            # iFormerBlock_light(320, 1/3, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 1/3, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 1/3, 3),#out:bs*128*10*28*28
-            # iFormerBlock_light(320, 1/2, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 1/2, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 1/2, 3),#out:bs*128*10*28*28
-            # iFormerBlock_light(320, 2/3, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 2/3, 3),#out:bs*128*10*28*28
-            iFormerBlock(320, 2/3, 3),#out:bs*128*10*28*28
+            nn.MaxPool3d(kernel_size=(3,3,3), stride=(2,2,2), padding=(1,1,1)),#out:bs*320*5*14*14
+            # iFormerBlock_light(320, 1/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/3, 3),#out:bs*320*5*14*14
+            # iFormerBlock_light(320, 1/2, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/2, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 1/2, 3),#out:bs*320*5*14*14
+            # iFormerBlock_light(320, 2/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 2/3, 3),#out:bs*320*5*14*14
+            iFormerBlock(320, 2/3, 3),#out:bs*320*5*14*14
 
             # BasicConv3d(320, 384, kernel_size=1, stride=1),#out:bs*512*5*14*14
             # SepConv3d(160, 256, kernel_size=3, stride=1, padding=1),#out:bs*256*5*14*14
-            nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),#out:bs*256*2*7*7
+            nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),#out:bs*320*2*7*7
             Mixed_5b(320),#out:bs*512*2*7*7
             Mixed_5c(512)#out:bs*1024*2*7*7
             
