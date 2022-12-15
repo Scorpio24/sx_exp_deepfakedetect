@@ -13,7 +13,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
-from albumentations import (Compose, PadIfNeeded)
+from albumentations import (Compose, PadIfNeeded, 
+                            ImageCompression, 
+                            GaussianBlur,
+                            ISONoise, IAAAdditiveGaussianNoise)
 from progress.bar import Bar
 from sklearn import metrics
 from sklearn.metrics import accuracy_score, auc, f1_score
@@ -23,7 +26,6 @@ from get_masked_face_simple import get_masked_face_simple
 from model import S3D
 from CA_S3D import CA_S3D_v3
 from msca_S3D import msca_S3D
-from msca_S3D import msca_S3D_SRM
 from transforms.albu import IsotropicResize
 from utils import (custom_round, custom_video_round, get_method)
 
@@ -47,7 +49,7 @@ modelname = {
     "msca_S3D_final_DFDC_mplan9":"msca_S3D+mask6",
     "msca_S3D_final_DFDC_mplan9_3":"msca_S3D+mask4",
     "CA_S3D_v3_final_DFDC_caplan1":"CA_S3D",
-    "CA_S3D_v3_final_DFDC_caplan5":"CA_S3D+SRM",
+    "CA_S3D_v3_final_DFDC_caplan9_4":"CA_S3D+mask2",
     "CA_S3D_v3_final_DFDC_caplan9":"CA_S3D+mask6",
     "CA_S3D_v3_final_DFDC_caplan9_2":"CA_S3D+mask8",
     "CA_S3D_v3_final_DFDC_caplan9_3":"CA_S3D+mask4",
@@ -62,6 +64,10 @@ if not os.path.exists(OUTPUT_DIR):
 
 def create_base_transform(size):
     return Compose([
+        ImageCompression(quality_lower=80, quality_upper=100, p=1),
+        # GaussianBlur(blur_limit=3, p=1), 
+        # ISONoise(p=1), 
+        # IAAAdditiveGaussianNoise(p=1), 
         IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
         PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
     ])
@@ -107,7 +113,9 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
     plt.title('ROC curve')
     plt.legend(loc='best')
 
-    output_dir = os.path.join(OUTPUT_DIR, model_name)
+    # ImageCompression, GaussianBlur, ISONoise, IAAAdditiveGaussianNoise
+    agu = "ImageCompression"
+    output_dir = os.path.join(OUTPUT_DIR, model_name, agu)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     plt.savefig(os.path.join(output_dir, dataset + "_acc" + str(accuracy*100) + "_loss"+str(loss)+"_f1"+str(f1)+".jpg"))
@@ -204,8 +212,6 @@ def modeleval(opt, dataset, config):
         model = S3D(num_class, config['model']['SRM-net'])
     elif opt.model_type == 1:
         model = msca_S3D(num_class, config['model']['SRM-net'])
-    elif opt.model_type == 2:
-        model = msca_S3D_SRM(num_class, config['model']['SRM-net'])
     elif opt.model_type == 3:
         model = CA_S3D_v3(num_class, config['model']['SRM-net'])
     model.load_state_dict(new_state_dict)
@@ -309,7 +315,7 @@ if __name__ == "__main__":
     
     parser.add_argument('--workers', default=10, type=int,
                         help='Number of data loader workers.')
-    parser.add_argument('--model_path', default="S3D_final_DFDC_plan1", type=str, metavar='PATH',
+    parser.add_argument('--model_path', type=str, metavar='PATH',
                         help='Path to model checkpoint (default: none).')
     parser.add_argument('--dataset', type=str, default="DFDC",
                         help="Which dataset to use (Deepfakes|Face2Face|FaceSwap|NeuralTextures|DFDC|Celeb_DF)")
@@ -323,21 +329,40 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
 
-    opt.config = "plan" + opt.model_path.split("plan")[1]
-    if not opt.config:
-        raise Exception("please input name of config file by '--config' .")
-
-    # 读取配置文件。
-    config_path = os.path.join("S3D/configs", opt.config+".yaml")
-    with open(config_path, 'r') as ymlfile:
-        config = yaml.safe_load(ymlfile)
-    print(config)
-
-    tempdir = tempfile.gettempdir()
-
-    if not opt.dataset:
-        datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC', 'Celeb_DF']
+    if not opt.model_path:
+        model_list = [("S3D_final_DFDC_plan1",0),
+                    ("CA_S3D_v3_final_DFDC_caplan1",3),
+                    ("CA_S3D_v3_final_DFDC_caplan9_4",3),
+                    ("CA_S3D_v3_final_DFDC_caplan9",3),
+                    ("CA_S3D_v3_final_DFDC_caplan9_2",3),
+                    ("CA_S3D_v3_final_DFDC_caplan9_3",3)]
     else:
-        datasets = [opt.dataset]
-    for dataset in datasets:
-        modeleval(opt, dataset, config)
+        model_list = [(opt.model_path, opt.model_type)]
+
+    for model_path, model_type in model_list:
+        opt.model_path = model_path
+        opt.model_type = model_type
+
+        if "caplan" in opt.model_path:
+            opt.config = "caplan" + opt.model_path.split("caplan")[1]
+        elif "maplan" in opt.model_path:
+            opt.config = "mplan" + opt.model_path.split("mplan")[1]
+        else:
+            opt.config = "plan" + opt.model_path.split("plan")[1]
+        if not opt.config:
+            raise Exception("please input name of config file by '--config' .")
+
+        # 读取配置文件。
+        config_path = os.path.join("S3D/configs", opt.config+".yaml")
+        with open(config_path, 'r') as ymlfile:
+            config = yaml.safe_load(ymlfile)
+        print(config)
+
+        tempdir = tempfile.gettempdir()
+
+        if not opt.dataset:
+            datasets = ['Deepfakes','Face2Face','FaceSwap','NeuralTextures','DFDC', 'Celeb_DF']
+        else:
+            datasets = [opt.dataset]
+        for dataset in datasets:
+            modeleval(opt, dataset, config)
