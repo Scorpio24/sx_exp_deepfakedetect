@@ -16,7 +16,7 @@ import yaml
 from albumentations import (Compose, PadIfNeeded, 
                             ImageCompression, 
                             GaussianBlur,
-                            ISONoise, IAAAdditiveGaussianNoise)
+                            ISONoise, GaussNoise)
 from progress.bar import Bar
 from sklearn import metrics
 from sklearn.metrics import accuracy_score, auc, f1_score
@@ -67,7 +67,7 @@ def create_base_transform(size):
         ImageCompression(quality_lower=80, quality_upper=100, p=1),
         # GaussianBlur(blur_limit=3, p=1), 
         # ISONoise(p=1), 
-        # IAAAdditiveGaussianNoise(p=1), 
+        GaussNoise(p=1), 
         IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
         PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
     ])
@@ -113,7 +113,7 @@ def save_roc_curves(dataset, correct_labels, preds, model_name, accuracy, loss, 
     plt.title('ROC curve')
     plt.legend(loc='best')
 
-    # ImageCompression, GaussianBlur, ISONoise, IAAAdditiveGaussianNoise
+    # ImageCompression, GaussianBlur, ISONoise, GaussNoise
     agu = "ImageCompression"
     output_dir = os.path.join(OUTPUT_DIR, model_name, agu)
     if not os.path.exists(output_dir):

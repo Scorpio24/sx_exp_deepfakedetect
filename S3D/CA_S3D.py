@@ -362,5 +362,5 @@ if __name__ == '__main__':
 
     input = torch.randn(11, 3, 20, 224, 224)
     flops, params = profile(model, inputs=(input,), verbose=False)
-    # flops, params = clever_format([flops, params], "%.3f")
+    flops, params = clever_format([flops, params], "%.3f")
     print(flops, params)
